@@ -1,11 +1,14 @@
-// NIMO 作品集 AI 助手后端（Cloudflare Worker）。
-// - 唯一接口：POST /chat，请求体 {message, history?}
+// nimobin.com 整站 Worker：Workers Static Assets 托管站点，本脚本只处理 /api/*。
+// - 唯一接口：POST /api/chat，请求体 {message, history?}；其他 /api/* 返回 404 JSON
+// - 非 /api/* 请求由静态资源直接响应（wrangler.jsonc 中 run_worker_first 只匹配 /api/*）
 // - DeepSeek 密钥只存在于 Worker secret（DEEPSEEK_API_KEY），浏览器拿不到
 // - 不记录请求/回答内容；上游错误统一映射为通用错误码，不透传上游响应
 import corpusData from '../../private/build/corpus.json';
 import { retrieve, type Corpus } from './retrieval';
 
 interface Env {
+  /** Workers Static Assets binding（../dist） */
+  ASSETS: Fetcher;
   /** secret：npx wrangler secret put DEEPSEEK_API_KEY */
   DEEPSEEK_API_KEY?: string;
   /** 逗号分隔的 Origin 白名单 */
@@ -51,7 +54,9 @@ const DEEPSEEK_MODEL = 'deepseek-chat';
 const MAX_TOKENS = 800;
 const UPSTREAM_TIMEOUT_MS = 14_000;
 
-const DEFAULT_ALLOWED_ORIGINS = 'https://nimo0808.github.io,http://localhost:4321';
+const CHAT_PATH = '/api/chat';
+const DEFAULT_ALLOWED_ORIGINS =
+  'https://nimobin.com,https://www.nimobin.com,http://localhost:8787,http://localhost:4321';
 const MAX_BODY_CHARS = 32 * 1024;
 const MAX_MESSAGE_LENGTH = 500;
 const MAX_HISTORY_ITEMS = 6;
@@ -206,10 +211,21 @@ async function callDeepSeek(apiKey: string, messages: { role: string; content: s
   }
 }
 
-async function handle(request: Request, env: Env): Promise<Response> {
-  const url = new URL(request.url);
-  if (url.pathname !== '/chat') return errorResponse('not_found');
+function isApiPath(pathname: string): boolean {
+  return pathname === '/api' || pathname.startsWith('/api/');
+}
 
+async function handle(request: Request, env: Env): Promise<Response> {
+  const { pathname } = new URL(request.url);
+  if (pathname === CHAT_PATH) return handleChat(request, env);
+  if (isApiPath(pathname)) return errorResponse('not_found');
+  // 非 /api/* 理论上由静态资源直接响应、不会进入脚本；万一进入（如找不到资源的非导航请求），
+  // 交回静态资源处理（含 not_found_handling）
+  return env.ASSETS.fetch(request);
+}
+
+async function handleChat(request: Request, env: Env): Promise<Response> {
+  // 同源请求同样带 Origin（浏览器对 POST 总会发送），白名单用于阻止其他网站从浏览器调用
   const origin = request.headers.get('Origin');
   if (!origin || !parseAllowedOrigins(env).has(origin)) return errorResponse('forbidden_origin');
 

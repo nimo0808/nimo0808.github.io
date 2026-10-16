@@ -1,4 +1,5 @@
-// Explore 客户端逻辑：只调用 Cloudflare Worker（PUBLIC_AI_ENDPOINT），浏览器里没有任何密钥或私有语料。
+// Explore 客户端逻辑：只调用 Cloudflare Worker（默认同源 /api/chat，可用 PUBLIC_AI_ENDPOINT 覆盖），
+// 浏览器里没有任何密钥或私有语料。
 // 安全约定：
 // - 用户输入、推荐卡片一律用 DOM API + textContent 构建；
 // - 助手回答（Markdown）经 marked 渲染后再经 DOMPurify 净化，链接仅允许 http/https/相对路径。
@@ -186,14 +187,14 @@ function init(input: HTMLInputElement, btn: HTMLButtonElement, container: HTMLEl
     parent.append(notice, list);
   }
 
-  async function requestAnswer(url: URL, message: string): Promise<ChatResult> {
+  async function requestAnswer(url: string, message: string): Promise<ChatResult> {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     const history = chatHistory
       .slice(-MAX_HISTORY_ITEMS)
       .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_HISTORY_CONTENT) }));
     try {
-      const res = await fetch(url.href, {
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, history }),
@@ -260,7 +261,7 @@ function init(input: HTMLInputElement, btn: HTMLButtonElement, container: HTMLEl
   });
 
   container.replaceChildren();
-  // 未配置 AI 端点时，进入页面就展示兜底提示与预设问题
+  // PUBLIC_AI_ENDPOINT 格式不合法时，进入页面就展示兜底提示与预设问题
   if (!endpoint) {
     const intro = createEl('div', 'message-unit');
     renderFallback(intro, 'unavailable');

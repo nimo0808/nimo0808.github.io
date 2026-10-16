@@ -19,8 +19,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
+      # GitHub Pages 不能自定义响应头：输出 meta CSP，并从 dist 移除 Cloudflare 专用的 _headers
+      DEPLOY_TARGET: github-pages
       # 仓库 Settings → Secrets and variables → Actions → Variables 中配置（非密钥）
+      # 留空时 Explore 请求同源 /api/chat（GitHub Pages 上不存在，会自动进入离线兜底）
       PUBLIC_AI_ENDPOINT: ${{ vars.PUBLIC_AI_ENDPOINT }}
+      # 设为 true 时允许搜索引擎收录；留空时输出 noindex（与 Cloudflare 构建同一开关）
+      PUBLIC_SITE_INDEXABLE: ${{ vars.PUBLIC_SITE_INDEXABLE }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7

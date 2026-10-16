@@ -7,7 +7,7 @@ import '@fontsource/inter/500.css';
 import '@fontsource/inter/600.css';
 import '@fontsource/inter/700.css';
 import '@fontsource/inter/900.css';
-import { getAiEndpoint } from '../lib/ai-endpoint';
+import { getAiEndpointCrossOrigin } from '../lib/ai-endpoint';
 
 interface Props {
   title: string;
@@ -16,10 +16,19 @@ interface Props {
 
 const { title, activeTab } = Astro.props;
 
-// GitHub Pages 不能自定义响应头，CSP 只能用 <meta> 下发（meta CSP 不支持 frame-ancestors）。
-// AI 端点 origin 在构建时由 PUBLIC_AI_ENDPOINT 推导，未配置时不放行任何额外 connect-src。
+const siteName = 'NIMO · Mobin 莫彬';
+const description = 'NIMO · Mobin 莫彬的设计作品集：数字体验设计、创意探索与产品开发。';
+
+// 临时 noindex：作品尚未准备好。PUBLIC_SITE_INDEXABLE=true 时去掉
+// （public/_headers 中的 X-Robots-Tag 行由 integrations/site-flags.mjs 按同一开关在构建时删除）。
+const indexable = import.meta.env.PUBLIC_SITE_INDEXABLE === 'true';
+
+// CSP：Cloudflare 构建由 public/_headers 以响应头下发（含 frame-ancestors），这里不再输出 meta，避免两份策略冲突。
+// GitHub Pages（DEPLOY_TARGET=github-pages）不能自定义响应头，只能用 <meta> 下发（meta CSP 不支持 frame-ancestors）。
+// AI 端点为同源相对路径时 'self' 已覆盖；为绝对地址时，由 PUBLIC_AI_ENDPOINT 推导 origin 追加到 connect-src。
 // 仅在生产构建中启用，避免影响 astro dev 的 HMR / Dev Toolbar 内联脚本。
-const aiOrigin = getAiEndpoint()?.origin;
+const metaCspEnabled = import.meta.env.PROD && import.meta.env.DEPLOY_TARGET === 'github-pages';
+const aiOrigin = getAiEndpointCrossOrigin();
 const csp = [
   "default-src 'self'",
   "script-src 'self'",
@@ -35,9 +44,11 @@ const csp = [
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    {import.meta.env.PROD && <meta http-equiv="Content-Security-Policy" content={csp} />}
+    {metaCspEnabled && <meta http-equiv="Content-Security-Policy" content={csp} />}
     <meta name="viewport" content="width=device-width" />
-    <title>{title} | NIMO</title>
+    {!indexable && <meta name="robots" content="noindex" />}
+    <title>{title} | {siteName}</title>
+    <meta name="description" content={description} />
     <style is:global>
       /* 1. 核心：锁死滚动条宽度，无论内容长短，页面都不会左右晃动 */
       html { scrollbar-gutter: stable; } 

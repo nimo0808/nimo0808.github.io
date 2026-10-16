@@ -1,13 +1,31 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "nimo-ai",
+  // 一个 Worker 同时托管整站静态资源（../dist）和 AI 接口（/api/*）
+  "name": "nimobin",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
-  // 阶段一使用 workers.dev 域名；阶段二绑定自定义域名后可改为 false
-  "workers_dev": true,
+  // 正式只走自定义域名：不开放 *.workers.dev 与预览地址
+  "workers_dev": false,
   "preview_urls": false,
 
-  // 部署 / 本地开发前，把 ../private/corpus 打包成 JSON（仅进入 Worker，不进入站点 dist，也不提交）
+  // Workers Custom Domains：deploy 时由 Cloudflare 自动创建 DNS 记录与证书（只作用于 nimobin.com 这个 zone）
+  // www → 根域名的 301 跳转在仪表盘用 Redirect Rules 配置，见 README
+  "routes": [
+    { "pattern": "nimobin.com", "custom_domain": true },
+    { "pattern": "www.nimobin.com", "custom_domain": true }
+  ],
+
+  // Workers Static Assets：先 `astro build`（根目录）生成 ../dist
+  "assets": {
+    "directory": "../dist",
+    "binding": "ASSETS",
+    // 只有 /api/* 先进入 Worker 脚本；其余请求直接由静态资源响应（不计入 Worker 调用）
+    "run_worker_first": ["/api/*"],
+    // 找不到资源时返回 404；配合 compatibility_date ≥ 2025-04-01，浏览器导航请求不会进入 Worker 脚本
+    "not_found_handling": "404-page"
+  },
+
+  // 部署 / 本地开发前，把 ../private/corpus 打包成 JSON（仅进入 Worker 脚本，不进入站点 dist，也不提交）
   "build": {
     "command": "node scripts/build-corpus.mjs",
     "watch_dir": ["src", "scripts", "../private/corpus"]
@@ -15,9 +33,9 @@
 
   // 非密钥配置；DeepSeek 密钥请用 `npx wrangler secret put DEEPSEEK_API_KEY`
   "vars": {
-    // 逗号分隔的 Origin 白名单（阶段二换域名时在这里追加）
-    "ALLOWED_ORIGINS": "https://nimo0808.github.io,http://localhost:4321",
-    // 一键关停：改为 "false" 后重新部署，/chat 返回 503 ai_disabled
+    // 逗号分隔的 Origin 白名单（防止其他网站从浏览器调用 /api/chat）
+    "ALLOWED_ORIGINS": "https://nimobin.com,https://www.nimobin.com,http://localhost:8787,http://localhost:4321",
+    // 一键关停：改为 "false" 后重新部署，/api/chat 返回 503 ai_disabled
     "AI_ENABLED": "true"
   },
 
@@ -33,5 +51,10 @@
   ],
 
   // 不开启 Workers Logs，避免记录请求/回答内容
-  "observability": { "enabled": false }
+  "observability": { "enabled": false },
+
+  // 本地 wrangler dev：它会把请求头里的 localhost:8787 改写成第一个 route 的地址（nimobin.com），
+  // 默认用 http 协议，导致同源请求的 Origin 变成 http://nimobin.com 而被白名单拒绝。
+  // 设为 https 后，本地脚本看到的 URL / Origin 与线上一致（https://nimobin.com）。
+  "dev": { "upstream_protocol": "https" }
 }

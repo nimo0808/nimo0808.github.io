@@ -6,6 +6,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
+    "preview:cf": "astro build && npm --prefix worker run dev",
+    "deploy:cf": "astro build && npm --prefix worker run deploy",
     "check": "astro check",
     "astro": "astro"
   },

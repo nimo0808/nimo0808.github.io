@@ -1,0 +1,3 @@
+# wrangler deploy 时不上传的文件（.gitignore 语法，相对 dist/）。
+# 本地 public/ 里的 macOS 元数据会被 astro build 原样复制进 dist/，不能当作公开资源上传。
+.DS_Store
