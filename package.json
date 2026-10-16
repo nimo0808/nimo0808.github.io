@@ -1,0 +1,24 @@
+{
+  "name": "puffy-point",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@fontsource/inter": "5.3.0",
+    "astro": "5.18.0",
+    "dompurify": "3.4.17",
+    "lottie-web": "5.13.0",
+    "marked": "18.1.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "@emnapi/runtime": "1.11.3",
+    "typescript": "5.9.3"
+  }
+}

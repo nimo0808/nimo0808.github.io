@@ -1,0 +1,121 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+export async function getStaticPaths() {
+  const projects = await getCollection('projects');
+  return projects.map(p => ({
+    params: { id: p.id },
+    props: { project: p },
+  }));
+}
+
+const { project } = Astro.props;
+const isAppDev = (project.data.tags || []).some(t => t.toLowerCase() === 'app development');
+---
+
+<BaseLayout title={project.data.title} activeTab="">
+  <style>
+    .project-detail-wrap {
+      padding: 240px 40px 200px 40px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .project-header {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      margin-bottom: 120px;
+    }
+
+    .project-header h1 {
+      font-size: 62px;
+      line-height: 1.05;
+      font-weight: 900;
+      margin: 0;
+      letter-spacing: -0.03em;
+    }
+
+    .project-year {
+      font-size: 62px;
+      line-height: 1.05;
+      font-weight: 900;
+      margin: 8px 0 0 0;
+      letter-spacing: -0.03em;
+      color: #000;
+    }
+
+    .project-right {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .project-summary {
+      font-size: 18px;
+      line-height: 1.6;
+      color: #000;
+      font-weight: 400;
+      white-space: pre-line;
+    }
+
+    .app-store-badge {
+      display: inline-block;
+      margin-top: 32px;
+    }
+
+    .app-store-badge img {
+      height: 40px;
+      width: auto;
+      transition: transform 0.3s ease;
+    }
+
+    .app-store-badge:hover img {
+      transform: scale(1.05);
+    }
+
+    .project-gallery {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .project-gallery img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    @media (max-width: 900px) {
+      .project-header { grid-template-columns: 1fr; gap: 30px; }
+      .project-detail-wrap { padding: 120px 20px; }
+      .project-header h1 { font-size: 32px; }
+      .project-year { font-size: 32px; }
+    }
+  </style>
+
+  <article class="project-detail-wrap">
+    <header class="project-header">
+      <div>
+        <h1>{project.data.title}</h1>
+        {project.data.year && <div class="project-year">{project.data.year}</div>}
+      </div>
+      <div class="project-right">
+        <div class="project-summary">
+          {project.data.summary || "Project summary description will be updated here."}
+        </div>
+        {isAppDev && project.data.appStoreUrl && (
+          <a class="app-store-badge" href={project.data.appStoreUrl} target="_blank" rel="noopener noreferrer">
+            <img src="/images/app-store-badge.svg" alt="Download on the App Store" />
+          </a>
+        )}
+      </div>
+    </header>
+
+    <div class="project-gallery">
+      {project.data.details && project.data.details.map((imgSrc) => (
+        <img src={imgSrc} alt="Project Detail" loading="lazy" />
+      ))}
+    </div>
+  </article>
+</BaseLayout>

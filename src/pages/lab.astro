@@ -1,0 +1,103 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+// Lab 数据列表
+const labItems = [
+  { type: 'image', url: '/images/photo/square_02.png' },
+  { type: 'image', url: '/images/photo/square_02.png' },
+  { type: 'image', url: '/images/photo/square_03.png' },
+  { type: 'image', url: '/images/photo/square_04.png' },
+  { type: 'image', url: '/images/photo/square_Cover01.png' },
+  // 这里可以继续增加，如果只有 5 个，剩下的 3 个格子会自动变白
+];
+---
+
+<BaseLayout title="Lab" activeTab="lab">
+  <style>
+    .lab-container {
+      padding: 240px 40px 160px 40px;
+      min-height: 100vh;
+      background: #fff; /* 确保整体背景是纯白 */
+    }
+
+    .lab-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      /* 移除 gap: 1px 和 background: #eee，这是产生灰块的根源 */
+      background: #fff; 
+    }
+
+    .lab-item {
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      /* 使用 border 来替代 gap，颜色设为极浅的灰 */
+      border-right: 1px solid #f2f2f2;
+      border-bottom: 1px solid #f2f2f2;
+    }
+
+    /* 优化：为了让网格看起来完整，给最左边和最顶边也补上边框（可选） */
+    .lab-grid {
+      border-top: 1px solid #f2f2f2;
+      border-left: 1px solid #f2f2f2;
+    }
+
+    .lab-item img, .lab-item video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .lab-item:hover img, .lab-item:hover video {
+      transform: scale(1.05);
+    }
+
+    /* 响应式调整 */
+    @media (max-width: 1024px) {
+      .lab-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .lab-grid { grid-template-columns: 1fr; }
+      .lab-container { padding: 100px 20px; }
+    }
+  </style>
+
+  <div class="lab-container">
+    <div class="lab-grid">
+      {labItems.map((item) => (
+        <div class="lab-item">
+          {item.type === 'video' ? (
+            <video 
+              src={item.url} 
+              muted 
+              loop 
+              playsinline 
+              class="lab-video"
+            ></video>
+          ) : (
+            <img src={item.url} alt="Nimo Lab Research" loading="lazy" />
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+
+  <script>
+    const videos = document.querySelectorAll<HTMLVideoElement>('.lab-video');
+    videos.forEach((video) => {
+      const parent = video.parentElement;
+      if (!parent) return;
+      parent.addEventListener('mouseenter', () => {
+        video.play().catch(() => {});
+      });
+      parent.addEventListener('mouseleave', () => {
+        video.pause();
+      });
+    });
+  </script>
+</BaseLayout>

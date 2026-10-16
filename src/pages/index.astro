@@ -1,0 +1,215 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getSortedProjects } from '../lib/projects';
+
+// 1. 获取项目数据（按 frontmatter order 排序，全部渲染，不再截断）
+const realProjects = await getSortedProjects();
+
+// 2. 原设计为 14 格：项目不足 14 个时用占位卡补齐网格；超过时全部展示
+const minSlots = 14;
+const placeholderCount = Math.max(0, minSlots - realProjects.length);
+const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProjects.length + i);
+---
+
+<BaseLayout title="Home" activeTab="work">
+  <style>
+    /* --- 1. Hero 品牌区 --- */
+    .hero-section {
+      padding: 180px 40px 140px 40px;
+      background: #FFF;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 75vh;
+    }
+    .hero-container {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 80px;
+      max-width: 1000px;
+      width: 100%;
+    }
+    /* 桌面保持 460px；窄屏按视口收缩（减去移动端左右 20px 内边距），避免横向溢出 */
+    .hero-logo-box { flex: 0 0 auto; width: min(460px, calc(100vw - 40px)); height: min(460px, calc(100vw - 40px)); display: flex; align-items: center; justify-content: center; }
+    .hero-text-content { flex: 1; max-width: 420px; }
+    .hero-title { font-size: 52px; margin: 0; line-height: 1; letter-spacing: -0.05em; font-weight: 900; text-transform: uppercase; color: #000; }
+    .hero-desc { font-size: 18px; color: #000; margin-top: 25px; line-height: 1.35; font-weight: 400; letter-spacing: -0.01em; }
+
+    /* --- 2. 作品宫格核心逻辑 --- */
+    .bento-grid { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fill, minmax(450px, 1fr)); 
+      background: #FFF; 
+      border-top: 1px solid #f9f9f9; 
+      border-left: 1px solid #f9f9f9;
+      box-sizing: border-box;
+    }
+    .bento-item { 
+      background: #FFF; 
+      padding: 60px 40px; 
+      text-decoration: none; 
+      color: inherit; 
+      display: block;
+      box-sizing: border-box;
+      border-right: 1px solid #f9f9f9;
+      border-bottom: 1px solid #f9f9f9;
+    }
+    .bento-item.is-real:hover { background: #FCFCFC; }
+    
+    .visual-container { width: 100%; aspect-ratio: 4/3; background: #F9F9F9; overflow: hidden; margin-bottom: 28px; }
+    .bento-item img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(100%); transition: 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+    .bento-item.is-real:hover img { filter: grayscale(0%); transform: scale(1.02); }
+
+    .category-tag { font-size: 11px; color: #AAA; text-transform: uppercase; letter-spacing: 2px; font-weight: 500; display: block; }
+    .project-title { font-size: 24px; margin: 2px 0 0 0; font-weight: 700; letter-spacing: -0.02em; color: #000; display: block; }
+    .is-placeholder .category-tag { opacity: 0.3; }
+    .is-placeholder .project-title { opacity: 0.1; }
+    .is-placeholder .visual-container { background: #F5F5F5; }
+
+    /* --- 3. 黑色底部：物理对齐与描述增强 --- */
+    .site-footer {
+      margin-top: 180px; 
+      background: #000;
+      color: #FFF;
+      /* 核心对齐：左右 40px 间距使内部元素边缘与上方图片边缘严格对齐 */
+      padding: 120px 40px; 
+      display: flex;
+      justify-content: center;
+      box-sizing: border-box;
+    }
+    
+    .footer-inner {
+      width: 100%;
+      /* 这里的 max-width 应该根据布局灵活调整，目前通过 space-between 实现两端对齐 */
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 60px;
+    }
+
+    .footer-graphic {
+      flex: 0 0 auto;
+    }
+    
+    .footer-brand-img {
+      width: 120px; 
+      height: auto;
+      display: block;
+    }
+
+    .footer-content {
+      flex: 0 1 auto;
+      text-align: left;
+      /* 绿色线条对应优化：加宽文本容器，增强横向气场 */
+      max-width: 900px; 
+    }
+
+    .footer-content h2 {
+      font-size: 32px;
+      font-weight: 900;
+      margin: 0 0 12px 0;
+      letter-spacing: 0px;
+    }
+
+    /* 新文案样式 */
+    .footer-desc {
+      font-size: 18px;
+      line-height: 1.4;
+      color: #FFF;
+      margin-bottom: 100px; /* 留出间距给底部联系方式 */
+      font-weight: 400;
+    }
+
+    .footer-contact {
+      font-size: 18px;
+      line-height: 1.4;
+      font-weight: 500;
+      color: #FFF;
+    }
+
+    /* 响应式适配 */
+    @media (max-width: 1024px) {
+      .hero-container { gap: 40px; max-width: 800px; }
+      .footer-inner { gap: 40px; }
+    }
+
+    @media (max-width: 768px) {
+      .hero-section { padding: 120px 20px 60px 20px; }
+      .hero-container { flex-direction: column; text-align: center; gap: 40px; }
+      .site-footer { padding: 80px 20px; margin-top: 100px; }
+      .footer-inner { flex-direction: column; align-items: center; text-align: center; }
+      .footer-content { text-align: center; }
+      .bento-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+
+  <!-- 1. Hero Section -->
+  <section class="hero-section">
+    <div class="hero-container">
+      <div class="hero-logo-box">
+        <div id="logo-container" style="width: 100%; height: 100%;"></div>
+      </div>
+      <div class="hero-text-content">
+        <h1 class="hero-title">NIMO</h1>
+        <p class="hero-desc">Focusing on digital experience design, creative exploration, and product development.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Work Grid（全部项目 + 不足 14 格时的占位卡） -->
+  <section id="work" class="bento-grid">
+    {realProjects.map((project) => (
+      <a href={`/projects/${project.id}`} class="bento-item is-real">
+        <div class="visual-container">
+          <img src={project.data.cover} alt={project.data.title} />
+        </div>
+        <span class="category-tag">{project.data.year} / {project.data.tags[0] || 'Design'}</span>
+        <h2 class="project-title">{project.data.title}</h2>
+      </a>
+    ))}
+    {placeholders.map((index) => (
+      <div class="bento-item is-placeholder">
+        <div class="visual-container"></div>
+        <span class="category-tag">Coming Soon / 0{index + 1}</span>
+        <h2 class="project-title">Project Archive</h2>
+      </div>
+    ))}
+  </section>
+
+  <!-- 3. Integrated Black Footer (Precision Aligned) -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <!-- 左侧：图形边缘与上方图片左边缘对齐 -->
+      <div class="footer-graphic">
+        <img src="/images/photo/Bottom Brand Graphic.png" alt="Nimo Graphic" class="footer-brand-img" />
+      </div>
+
+      <!-- 右侧：长描述文案，宽度拉开 -->
+      <div class="footer-content">
+        <h2>NIMO</h2>
+        <p class="footer-desc">
+          Focusing on digital experience design, creative exploration, and product innovation — partnering with leading brands including Xiaomi, Meizu, Tencent, Codemao, Ones, Geely, Polestar, and Lynk & Co to shape next-generation intelligent experiences.
+        </p>
+
+        <div class="footer-contact">
+          <div>Tel : 13530771729</div>
+          <div>Mail : 1255926879@qq.Com</div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // light 版只含 svg 渲染器、不含 expressions（logodata.json 未使用 expressions），不依赖 eval
+    import lottie from 'lottie-web/build/player/lottie_light';
+    const logoContainer = document.getElementById('logo-container');
+    if (logoContainer) {
+      lottie.loadAnimation({ 
+        container: logoContainer, 
+        renderer: 'svg', loop: true, autoplay: true, 
+        path: '/images/data/logodata.json' 
+      });
+    }
+  </script>
+</BaseLayout>

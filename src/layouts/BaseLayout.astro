@@ -1,0 +1,88 @@
+---
+// src/layouts/BaseLayout.astro
+// 自托管 Inter（替代 Google Fonts @import），字重与原来一致：300/400/500/600/700/900
+import '@fontsource/inter/300.css';
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/inter/700.css';
+import '@fontsource/inter/900.css';
+import { getAiEndpoint } from '../lib/ai-endpoint';
+
+interface Props {
+  title: string;
+  activeTab?: string;
+}
+
+const { title, activeTab } = Astro.props;
+
+// GitHub Pages 不能自定义响应头，CSP 只能用 <meta> 下发（meta CSP 不支持 frame-ancestors）。
+// AI 端点 origin 在构建时由 PUBLIC_AI_ENDPOINT 推导，未配置时不放行任何额外 connect-src。
+// 仅在生产构建中启用，避免影响 astro dev 的 HMR / Dev Toolbar 内联脚本。
+const aiOrigin = getAiEndpoint()?.origin;
+const csp = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  `connect-src 'self'${aiOrigin ? ` ${aiOrigin}` : ''}`,
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ');
+---
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    {import.meta.env.PROD && <meta http-equiv="Content-Security-Policy" content={csp} />}
+    <meta name="viewport" content="width=device-width" />
+    <title>{title} | NIMO</title>
+    <style is:global>
+      /* 1. 核心：锁死滚动条宽度，无论内容长短，页面都不会左右晃动 */
+      html { scrollbar-gutter: stable; } 
+      
+      body { font-family: 'Inter', sans-serif; margin: 0; background: #fff; color: #000; -webkit-font-smoothing: antialiased; }
+
+      /* 2. 统一 Nav：物理像素锁死 */
+      nav { 
+        position: fixed; top: 0; left: 0; width: 100%; 
+        display: flex; justify-content: space-between; 
+        padding: 0 40px; background: white; z-index: 1000; 
+        box-sizing: border-box; align-items: center; 
+        height: 80px; /* 强制高度 */
+      }
+      .logo-link { display: flex; align-items: center; }
+      .logo-img { height: 18px !important; width: auto; display: block; } /* 锁死 Logo 高度 */
+      
+      .nav-links { display: flex; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; height: 80px; align-items: center; }
+      .nav-links a { 
+        text-decoration: none; color: #000; margin-left: 35px; 
+        font-weight: 500; /* 采用细体精致感 */
+        padding: 6px 0; 
+        border-bottom: 1px solid transparent; /* 预留 1px 空间防止跳动 */
+        transition: opacity 0.2s ease;
+      }
+      .nav-links a.active { border-bottom: 1px solid #000; }
+      .nav-links a:hover { opacity: 0.6; }
+
+      @media (max-width: 768px) {
+        nav { padding: 0 20px; }
+        .nav-links a { margin-left: 15px; font-size: 10px; }
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/" class="logo-link">
+        <img src="/images/photo/Top bar icons.png" alt="NIMO" class="logo-img" />
+      </a>
+      <div class="nav-links">
+        <a href="/" class={activeTab === 'work' ? 'active' : ''}>Work</a>
+        <a href="/lab" class={activeTab === 'lab' ? 'active' : ''}>Lab</a>
+        <a href="/explore" class={activeTab === 'explore' ? 'active' : ''}>Explore</a>
+      </div>
+    </nav>
+    <main><slot /></main>
+  </body>
+</html>
