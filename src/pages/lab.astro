@@ -17,14 +17,15 @@ const labItems = [
     .lab-container {
       padding: 240px 40px 160px 40px;
       min-height: 100vh;
-      background: #fff; /* 确保整体背景是纯白 */
+      background: var(--color-page-bg);
+      color: var(--color-text-primary);
+      transition: background-color 180ms ease, color 180ms ease;
     }
 
     .lab-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      /* 移除 gap: 1px 和 background: #eee，这是产生灰块的根源 */
-      background: #fff; 
+      background: var(--color-surface);
     }
 
     .lab-item {
@@ -34,22 +35,22 @@ const labItems = [
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #fff;
-      /* 使用 border 来替代 gap，颜色设为极浅的灰 */
-      border-right: 1px solid #f2f2f2;
-      border-bottom: 1px solid #f2f2f2;
+      background: var(--color-surface);
+      border-right: 1px solid var(--color-grid-border);
+      border-bottom: 1px solid var(--color-grid-border);
+      transition: background-color 180ms ease, border-color 180ms ease;
     }
 
-    /* 优化：为了让网格看起来完整，给最左边和最顶边也补上边框（可选） */
     .lab-grid {
-      border-top: 1px solid #f2f2f2;
-      border-left: 1px solid #f2f2f2;
+      border-top: 1px solid var(--color-grid-border);
+      border-left: 1px solid var(--color-grid-border);
     }
 
     .lab-item img, .lab-item video {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      filter: none;
       transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
     }
 

@@ -16,11 +16,12 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
     /* --- 1. Hero 品牌区 --- */
     .hero-section {
       padding: 180px 40px 140px 40px;
-      background: #FFF;
+      background: var(--color-page-bg);
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 75vh;
+      transition: background-color 180ms ease;
     }
     .hero-container {
       display: flex;
@@ -32,53 +33,58 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
     }
     /* 桌面保持 460px；窄屏按视口收缩（减去移动端左右 20px 内边距），避免横向溢出 */
     .hero-logo-box { flex: 0 0 auto; width: min(460px, calc(100vw - 40px)); height: min(460px, calc(100vw - 40px)); display: flex; align-items: center; justify-content: center; }
+    #logo-container { filter: var(--logo-filter); transition: filter 180ms ease; }
     .hero-text-content { flex: 1; max-width: 420px; }
-    .hero-title { font-size: 52px; margin: 0; line-height: 1; letter-spacing: -0.05em; font-weight: 900; text-transform: uppercase; color: #000; }
-    .hero-desc { font-size: 18px; color: #000; margin-top: 25px; line-height: 1.35; font-weight: 400; letter-spacing: -0.01em; }
+    .hero-title { font-size: 52px; margin: 0; line-height: 1; letter-spacing: -0.05em; font-weight: 900; text-transform: uppercase; color: var(--color-text-primary); }
+    .hero-desc { font-size: 18px; color: var(--color-text-primary); margin-top: 25px; line-height: 1.35; font-weight: 400; letter-spacing: -0.01em; }
 
     /* --- 2. 作品宫格核心逻辑 --- */
-    .bento-grid { 
-      display: grid; 
-      grid-template-columns: repeat(auto-fill, minmax(450px, 1fr)); 
-      background: #FFF; 
-      border-top: 1px solid #f9f9f9; 
-      border-left: 1px solid #f9f9f9;
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+      background: var(--color-surface);
+      border-top: 1px solid var(--color-border-subtle);
+      border-left: 1px solid var(--color-border-subtle);
       box-sizing: border-box;
     }
-    .bento-item { 
-      background: #FFF; 
-      padding: 60px 40px; 
-      text-decoration: none; 
-      color: inherit; 
+    .bento-item {
+      background: var(--color-surface);
+      padding: 60px 40px;
+      text-decoration: none;
+      color: inherit;
       display: block;
       box-sizing: border-box;
-      border-right: 1px solid #f9f9f9;
-      border-bottom: 1px solid #f9f9f9;
+      border-right: 1px solid var(--color-border-subtle);
+      border-bottom: 1px solid var(--color-border-subtle);
+      transition: background-color 180ms ease, border-color 180ms ease;
     }
-    .bento-item.is-real:hover { background: #FCFCFC; }
-    
-    .visual-container { width: 100%; aspect-ratio: 4/3; background: #F9F9F9; overflow: hidden; margin-bottom: 28px; }
-    .bento-item img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(100%); transition: 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+    .bento-item.is-real:hover { background: var(--color-bento-hover); }
+    .bento-item.is-real:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: -2px; }
+
+    .visual-container { width: 100%; aspect-ratio: 4/3; background: var(--color-surface-muted); overflow: hidden; margin-bottom: 28px; transition: background-color 180ms ease; }
+    .bento-item img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(100%); transition: filter 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
     .bento-item.is-real:hover img { filter: grayscale(0%); transform: scale(1.02); }
 
-    .category-tag { font-size: 11px; color: #AAA; text-transform: uppercase; letter-spacing: 2px; font-weight: 500; display: block; }
-    .project-title { font-size: 24px; margin: 2px 0 0 0; font-weight: 700; letter-spacing: -0.02em; color: #000; display: block; }
+    .category-tag { font-size: 11px; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 2px; font-weight: 500; display: block; }
+    .project-title { font-size: 24px; margin: 2px 0 0 0; font-weight: 700; letter-spacing: -0.02em; color: var(--color-text-primary); display: block; }
     .is-placeholder .category-tag { opacity: 0.3; }
     .is-placeholder .project-title { opacity: 0.1; }
-    .is-placeholder .visual-container { background: #F5F5F5; }
+    .is-placeholder .visual-container { background: var(--color-surface-subtle); }
 
     /* --- 3. 黑色底部：物理对齐与描述增强 --- */
     .site-footer {
-      margin-top: 180px; 
-      background: #000;
-      color: #FFF;
+      margin-top: 180px;
+      background: var(--color-footer-bg);
+      color: var(--color-footer-text);
+      border-top: 1px solid var(--color-footer-border);
       /* 核心对齐：左右 40px 间距使内部元素边缘与上方图片边缘严格对齐 */
-      padding: 120px 40px; 
+      padding: 120px 40px;
       display: flex;
       justify-content: center;
       box-sizing: border-box;
+      transition: border-color 180ms ease;
     }
-    
+
     .footer-inner {
       width: 100%;
       /* 这里的 max-width 应该根据布局灵活调整，目前通过 space-between 实现两端对齐 */
@@ -91,18 +97,19 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
     .footer-graphic {
       flex: 0 0 auto;
     }
-    
+
     .footer-brand-img {
-      width: 120px; 
+      width: 120px;
       height: auto;
       display: block;
+      filter: none;
     }
 
     .footer-content {
       flex: 0 1 auto;
       text-align: left;
       /* 绿色线条对应优化：加宽文本容器，增强横向气场 */
-      max-width: 900px; 
+      max-width: 900px;
     }
 
     .footer-content h2 {
@@ -116,7 +123,7 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
     .footer-desc {
       font-size: 18px;
       line-height: 1.4;
-      color: #FFF;
+      color: var(--color-footer-text);
       margin-bottom: 100px; /* 留出间距给底部联系方式 */
       font-weight: 400;
     }
@@ -125,7 +132,7 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
       font-size: 18px;
       line-height: 1.4;
       font-weight: 500;
-      color: #FFF;
+      color: var(--color-footer-text);
     }
 
     /* 响应式适配 */

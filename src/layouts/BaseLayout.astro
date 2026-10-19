@@ -46,36 +46,123 @@ const csp = [
     <meta charset="utf-8" />
     {metaCspEnabled && <meta http-equiv="Content-Security-Policy" content={csp} />}
     <meta name="viewport" content="width=device-width" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
     {!indexable && <meta name="robots" content="noindex" />}
     <title>{title} | {siteName}</title>
     <meta name="description" content={description} />
     <style is:global>
+      :root {
+        color-scheme: light dark;
+        --color-page-bg: #fff;
+        --color-text-primary: #000;
+        --color-text-secondary: #888;
+        --color-text-muted: #aaa;
+        --color-text-weak: #bbb;
+        --color-project-summary: #000;
+        --color-surface: #fff;
+        --color-surface-hover: #fcfcfc;
+        --color-bento-hover: #fcfcfc;
+        --color-card-hover: #fafafa;
+        --color-control-hover: #eaeaea;
+        --color-surface-muted: #f9f9f9;
+        --color-surface-subtle: #f5f5f5;
+        --color-border: #eee;
+        --color-border-subtle: #f9f9f9;
+        --color-grid-border: #f2f2f2;
+        --color-gallery-gap: #fff;
+        --color-input-bg: #f4f4f4;
+        --color-input-placeholder: #888;
+        --color-button-bg: #000;
+        --color-button-text: #fff;
+        --color-focus-ring: #000;
+        --color-footer-bg: #000;
+        --color-footer-text: #fff;
+        --color-footer-border: #000;
+        --shadow-nav: 0 1px 0 transparent;
+        --shadow-surface: 0 8px 30px rgb(0 0 0 / 4%);
+        --logo-filter: none;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --color-page-bg: #000;
+          --color-text-primary: #fff;
+          --color-text-secondary: #b5b5b5;
+          --color-text-muted: #8a8a8a;
+          --color-text-weak: #777;
+          --color-project-summary: #b5b5b5;
+          --color-surface: #0a0a0a;
+          --color-surface-hover: #141414;
+          --color-bento-hover: #141414;
+          --color-card-hover: #141414;
+          --color-control-hover: #1f1f1f;
+          --color-surface-muted: #101010;
+          --color-surface-subtle: #141414;
+          --color-border: #2a2a2a;
+          --color-border-subtle: #1a1a1a;
+          --color-grid-border: #242424;
+          --color-gallery-gap: #1a1a1a;
+          --color-input-bg: #141414;
+          --color-input-placeholder: #777;
+          --color-button-bg: #fff;
+          --color-button-text: #000;
+          --color-focus-ring: #fff;
+          --color-footer-border: #242424;
+          --shadow-nav: 0 1px 0 #1a1a1a;
+          --shadow-surface: 0 8px 30px rgb(0 0 0 / 35%);
+          --logo-filter: brightness(0) invert(1);
+        }
+      }
+
       /* 1. 核心：锁死滚动条宽度，无论内容长短，页面都不会左右晃动 */
-      html { scrollbar-gutter: stable; } 
-      
-      body { font-family: 'Inter', sans-serif; margin: 0; background: #fff; color: #000; -webkit-font-smoothing: antialiased; }
+      html { scrollbar-gutter: stable; }
+
+      body {
+        font-family: 'Inter', sans-serif;
+        margin: 0;
+        background: var(--color-page-bg);
+        color: var(--color-text-primary);
+        -webkit-font-smoothing: antialiased;
+        transition: background-color 180ms ease, color 180ms ease;
+      }
 
       /* 2. 统一 Nav：物理像素锁死 */
-      nav { 
-        position: fixed; top: 0; left: 0; width: 100%; 
-        display: flex; justify-content: space-between; 
-        padding: 0 40px; background: white; z-index: 1000; 
-        box-sizing: border-box; align-items: center; 
+      nav {
+        position: fixed; top: 0; left: 0; width: 100%;
+        display: flex; justify-content: space-between;
+        padding: 0 40px; background: var(--color-page-bg); z-index: 1000;
+        box-sizing: border-box; align-items: center;
         height: 80px; /* 强制高度 */
+        box-shadow: var(--shadow-nav);
+        transition: background-color 180ms ease, box-shadow 180ms ease;
       }
       .logo-link { display: flex; align-items: center; }
-      .logo-img { height: 18px !important; width: auto; display: block; } /* 锁死 Logo 高度 */
-      
+      .logo-img { height: 18px !important; width: auto; display: block; filter: none; } /* 锁死 Logo 高度 */
+
       .nav-links { display: flex; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; height: 80px; align-items: center; }
-      .nav-links a { 
-        text-decoration: none; color: #000; margin-left: 35px; 
+      .nav-links a {
+        text-decoration: none; color: var(--color-text-primary); margin-left: 35px;
         font-weight: 500; /* 采用细体精致感 */
-        padding: 6px 0; 
+        padding: 6px 0;
         border-bottom: 1px solid transparent; /* 预留 1px 空间防止跳动 */
-        transition: opacity 0.2s ease;
+        transition: color 180ms ease, opacity 180ms ease, border-color 180ms ease;
       }
-      .nav-links a.active { border-bottom: 1px solid #000; }
+      .nav-links a.active { border-bottom-color: var(--color-text-primary); }
       .nav-links a:hover { opacity: 0.6; }
+      .logo-link:focus-visible, .nav-links a:focus-visible {
+        outline: 2px solid var(--color-focus-ring);
+        outline-offset: 4px;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+        }
+      }
 
       @media (max-width: 768px) {
         nav { padding: 0 20px; }
