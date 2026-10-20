@@ -16,11 +16,11 @@ export interface FallbackQA {
 }
 
 export const FALLBACK_NOTICES = {
-  unavailable: 'AI 助手暂时无法连接（部分网络环境下可能无法访问）。你可以先看看这些常见问题：',
-  timeout: 'AI 助手响应超时了。你可以稍后再试，或先看看这些常见问题：',
-  rate_limited: '提问有点频繁，请稍等一分钟再试。你也可以先看看这些常见问题：',
-  ai_disabled: 'AI 助手暂时关闭了。你可以先看看这些常见问题：',
-  error: 'AI 助手暂时出了点问题。你可以稍后再试，或先看看这些常见问题：',
+  unavailable: '助手暂时离开，可以先看看这些问题',
+  timeout: '助手暂时离开，可以先看看这些问题',
+  rate_limited: '助手暂时离开，可以先看看这些问题',
+  ai_disabled: '助手暂时离开，可以先看看这些问题',
+  error: '助手暂时离开，可以先看看这些问题',
 } as const;
 
 export type FallbackReason = keyof typeof FALLBACK_NOTICES;

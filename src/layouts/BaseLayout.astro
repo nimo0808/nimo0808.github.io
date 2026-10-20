@@ -8,6 +8,7 @@ import '@fontsource/inter/600.css';
 import '@fontsource/inter/700.css';
 import '@fontsource/inter/900.css';
 import { getAiEndpointCrossOrigin } from '../lib/ai-endpoint';
+import SiteIndexOverlay from '../components/SiteIndexOverlay.astro';
 
 interface Props {
   title: string;
@@ -137,8 +138,37 @@ const csp = [
         box-shadow: var(--shadow-nav);
         transition: background-color 180ms ease, box-shadow 180ms ease;
       }
-      .logo-link { display: flex; align-items: center; }
-      .logo-img { height: 18px !important; width: auto; display: block; filter: none; } /* 锁死 Logo 高度 */
+      .logo-link {
+        position: relative;
+        display: grid;
+        place-items: center;
+        flex: 0 0 44px;
+        width: 44px;
+        height: 44px;
+        margin-left: -12px;
+        padding: 12px;
+        box-sizing: border-box;
+        appearance: none;
+        -webkit-appearance: none;
+        border: 0;
+        border-radius: 0;
+        outline: 0;
+        background: transparent;
+        box-shadow: none;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+      }
+      .logo-link::after {
+        content: '';
+        position: absolute;
+        inset: 8px;
+        border: 1px solid transparent;
+        border-radius: 50%;
+        pointer-events: none;
+      }
+      .logo-link:focus-visible::after { border-color: var(--color-focus-ring); }
+      .logo-img { display: block; width: 20px !important; height: 20px !important; max-width: none; object-fit: cover; filter: none; } /* 锁死 Logo 尺寸 */
 
       .nav-links { display: flex; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; height: 80px; align-items: center; }
       .nav-links a {
@@ -149,10 +179,11 @@ const csp = [
         transition: color 180ms ease, opacity 180ms ease, border-color 180ms ease;
       }
       .nav-links a.active { border-bottom-color: var(--color-text-primary); }
+      body.site-index-open .nav-links a.active { border-bottom-color: transparent; }
       .nav-links a:hover { opacity: 0.6; }
-      .logo-link:focus-visible, .nav-links a:focus-visible {
-        outline: 2px solid var(--color-focus-ring);
-        outline-offset: 4px;
+      .nav-links a:focus-visible {
+        outline: 1px solid var(--color-focus-ring);
+        outline-offset: 5px;
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -172,15 +203,23 @@ const csp = [
   </head>
   <body>
     <nav>
-      <a href="/" class="logo-link">
-        <img src="/images/photo/Top bar icons.png" alt="NIMO" class="logo-img" />
-      </a>
+      <button
+        type="button"
+        class="logo-link site-index-toggle"
+        data-site-index-toggle
+        aria-expanded="false"
+        aria-controls="site-index-overlay"
+        aria-label="打开工作经历与作品索引"
+      >
+        <img src="/images/photo/Top bar icons.png" alt="" class="logo-img" />
+      </button>
       <div class="nav-links">
         <a href="/" class={activeTab === 'work' ? 'active' : ''}>Work</a>
         <a href="/lab" class={activeTab === 'lab' ? 'active' : ''}>Lab</a>
         <a href="/explore" class={activeTab === 'explore' ? 'active' : ''}>Explore</a>
       </div>
     </nav>
+    <SiteIndexOverlay />
     <main><slot /></main>
   </body>
 </html>

@@ -15,7 +15,7 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
   <style>
     /* --- 1. Hero 品牌区 --- */
     .hero-section {
-      padding: 180px 40px 140px 40px;
+      padding: 140px 40px 180px 40px;
       background: var(--color-page-bg);
       display: flex;
       justify-content: center;
@@ -35,8 +35,10 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
     .hero-logo-box { flex: 0 0 auto; width: min(460px, calc(100vw - 40px)); height: min(460px, calc(100vw - 40px)); display: flex; align-items: center; justify-content: center; }
     #logo-container { filter: var(--logo-filter); transition: filter 180ms ease; }
     .hero-text-content { flex: 1; max-width: 420px; }
-    .hero-title { font-size: 52px; margin: 0; line-height: 1; letter-spacing: -0.05em; font-weight: 900; text-transform: uppercase; color: var(--color-text-primary); }
-    .hero-desc { font-size: 18px; color: var(--color-text-primary); margin-top: 25px; line-height: 1.35; font-weight: 400; letter-spacing: -0.01em; }
+    .hero-title { font-size: 56px; margin: 0; line-height: 1; letter-spacing: -0.05em; font-weight: 900; text-transform: uppercase; color: var(--color-text-primary); }
+    .hero-desc { font-size: 22px; color: var(--color-text-primary); margin-top: 25px; line-height: 1.35; font-weight: 400; letter-spacing: -0.01em; }
+    .hero-annotated { white-space: nowrap; }
+    .hero-note { font-size: 10px; color: var(--color-text-secondary); line-height: 0; font-weight: 400; letter-spacing: 0; vertical-align: super; white-space: nowrap; }
 
     /* --- 2. 作品宫格核心逻辑 --- */
     .bento-grid {
@@ -142,8 +144,10 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
     }
 
     @media (max-width: 768px) {
-      .hero-section { padding: 120px 20px 60px 20px; }
+      .hero-section { padding: 80px 20px 100px 20px; }
       .hero-container { flex-direction: column; text-align: center; gap: 40px; }
+      /* 手机端 Logo 动画等比缩小（容器 350px → 290px，可见 Logo 约 158px → 131px） */
+      .hero-logo-box { width: min(290px, calc(100vw - 40px)); height: min(290px, calc(100vw - 40px)); }
       .site-footer { padding: 80px 20px; margin-top: 100px; }
       .footer-inner { flex-direction: column; align-items: center; text-align: center; }
       .footer-content { text-align: center; }
@@ -159,7 +163,9 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
       </div>
       <div class="hero-text-content">
         <h1 class="hero-title">NIMO</h1>
-        <p class="hero-desc">Focusing on digital experience design, creative exploration, and product development.</p>
+        <p class="hero-desc">
+          Focusing on digital experience <span class="hero-annotated">design<sup class="hero-note">01 系统体验设计</sup></span>, creative <span class="hero-annotated">exploration<sup class="hero-note">02 创意视觉</sup></span>, and AI-native product <span class="hero-annotated">development<sup class="hero-note">03 产品开发</sup></span>.
+        </p>
       </div>
     </div>
   </section>

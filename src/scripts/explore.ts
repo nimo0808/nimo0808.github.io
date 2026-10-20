@@ -87,10 +87,22 @@ function loadHistory(): ChatMessage[] {
   }
 }
 
-function init(input: HTMLInputElement, btn: HTMLButtonElement, container: HTMLElement, projects: ProjectCard[]) {
+function init(
+  input: HTMLInputElement,
+  btn: HTMLButtonElement,
+  container: HTMLElement,
+  emptyState: HTMLElement,
+  projects: ProjectCard[],
+) {
   const endpoint = getAiEndpoint();
   const chatHistory = loadHistory();
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const emptyButtons = Array.from(
+    emptyState.querySelectorAll<HTMLButtonElement>('[data-empty-question]'),
+  );
   let pending = false;
+  let emptyShowFrame: number | undefined;
+  let emptyHideTimer: number | undefined;
 
   const saveChat = () => {
     try {
@@ -101,6 +113,45 @@ function init(input: HTMLInputElement, btn: HTMLButtonElement, container: HTMLEl
   };
 
   const scrollToBottom = () => window.scrollTo(0, document.body.scrollHeight);
+
+  const showEmptyState = () => {
+    if (container.childElementCount > 0) return;
+    if (emptyHideTimer !== undefined) {
+      window.clearTimeout(emptyHideTimer);
+      emptyHideTimer = undefined;
+    }
+    if (emptyShowFrame !== undefined) window.cancelAnimationFrame(emptyShowFrame);
+    emptyState.hidden = false;
+    emptyState.inert = false;
+    emptyState.setAttribute('aria-hidden', 'false');
+    emptyState.dataset.state = 'hidden';
+    emptyShowFrame = window.requestAnimationFrame(() => {
+      emptyShowFrame = undefined;
+      if (container.childElementCount === 0 && !emptyState.hidden) {
+        emptyState.dataset.state = 'visible';
+      }
+    });
+  };
+
+  const hideEmptyState = () => {
+    if (emptyShowFrame !== undefined) {
+      window.cancelAnimationFrame(emptyShowFrame);
+      emptyShowFrame = undefined;
+    }
+    if (emptyHideTimer !== undefined) window.clearTimeout(emptyHideTimer);
+    emptyState.dataset.state = 'hidden';
+    emptyState.inert = true;
+    emptyState.setAttribute('aria-hidden', 'true');
+    if (emptyState.hidden || reducedMotion.matches) {
+      emptyState.hidden = true;
+      emptyHideTimer = undefined;
+      return;
+    }
+    emptyHideTimer = window.setTimeout(() => {
+      emptyState.hidden = true;
+      emptyHideTimer = undefined;
+    }, 220);
+  };
 
   function appendUserBlock(text: string): { unit: HTMLElement; side: HTMLElement } {
     const unit = createEl('div', 'message-unit');
@@ -220,9 +271,11 @@ function init(input: HTMLInputElement, btn: HTMLButtonElement, container: HTMLEl
     }
   }
 
-  async function handleChat() {
-    const query = input.value.trim().slice(0, MAX_MESSAGE_LENGTH);
+  async function submitQuestion(text: string) {
+    const query = text.trim().slice(0, MAX_MESSAGE_LENGTH);
     if (!query || pending) return;
+
+    hideEmptyState();
     const block = appendUserBlock(query);
     input.value = '';
     scrollToBottom();
@@ -255,10 +308,16 @@ function init(input: HTMLInputElement, btn: HTMLButtonElement, container: HTMLEl
     }
   }
 
-  btn.addEventListener('click', handleChat);
-  input.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !e.isComposing) handleChat();
+  btn.addEventListener('click', () => void submitQuestion(input.value));
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.isComposing) void submitQuestion(input.value);
   });
+  for (const button of emptyButtons) {
+    button.addEventListener('click', () => {
+      const question = button.dataset.emptyQuestion;
+      if (question) void submitQuestion(question);
+    });
+  }
 
   container.replaceChildren();
   // PUBLIC_AI_ENDPOINT 格式不合法时，进入页面就展示兜底提示与预设问题
@@ -267,17 +326,25 @@ function init(input: HTMLInputElement, btn: HTMLButtonElement, container: HTMLEl
     renderFallback(intro, 'unavailable');
     container.appendChild(intro);
   }
+
+  if (container.childElementCount === 0) {
+    showEmptyState();
+  } else {
+    hideEmptyState();
+  }
 }
 
 const input = document.getElementById('userInput');
 const btn = document.getElementById('sendBtn');
 const container = document.getElementById('chatContainer');
+const emptyState = document.getElementById('exploreEmpty');
 const dataEl = document.getElementById('explore-data');
 
 if (
   input instanceof HTMLInputElement &&
   btn instanceof HTMLButtonElement &&
   container &&
+  emptyState &&
   dataEl
 ) {
   let projects: ProjectCard[] = [];
@@ -286,5 +353,5 @@ if (
   } catch {
     projects = [];
   }
-  init(input, btn, container, projects);
+  init(input, btn, container, emptyState, projects);
 }
