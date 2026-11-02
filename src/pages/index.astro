@@ -32,13 +32,33 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
       width: 100%;
     }
     /* 桌面保持 460px；窄屏按视口收缩（减去移动端左右 20px 内边距），避免横向溢出 */
-    .hero-logo-box { flex: 0 0 auto; width: min(460px, calc(100vw - 40px)); height: min(460px, calc(100vw - 40px)); display: flex; align-items: center; justify-content: center; }
-    #logo-container { filter: var(--logo-filter); transition: filter 180ms ease; }
+    .hero-logo-box { position: relative; flex: 0 0 auto; width: min(460px, calc(100vw - 40px)); height: min(460px, calc(100vw - 40px)); display: flex; align-items: center; justify-content: center; }
+    #logo-container { width: 100%; height: 100%; filter: var(--logo-filter); opacity: 1; transition: filter 180ms ease, opacity 120ms ease; }
+    .hero-logo-sequence { position: absolute; inset: 20%; width: 60%; height: 60%; object-fit: contain; opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
+    .hero-logo-box.is-sequence-active #logo-container { opacity: 0; }
+    .hero-logo-box.is-sequence-active .hero-logo-sequence { opacity: 1; }
+    .hero-logo-sequence.is-settled { animation: logo-sequence-settle 120ms ease-out both; }
+    @keyframes logo-sequence-settle {
+      from { transform: scale(0.985); filter: contrast(0.96); }
+      to { transform: scale(1); filter: contrast(1); }
+    }
     .hero-text-content { flex: 1; max-width: 420px; }
     .hero-title { font-size: 56px; margin: 0; line-height: 1; letter-spacing: -0.05em; font-weight: 900; text-transform: uppercase; color: var(--color-text-primary); }
     .hero-desc { font-size: 22px; color: var(--color-text-primary); margin-top: 25px; line-height: 1.35; font-weight: 400; letter-spacing: -0.01em; }
     .hero-annotated { white-space: nowrap; }
-    .hero-note { font-size: 10px; color: var(--color-text-secondary); line-height: 0; font-weight: 400; letter-spacing: 0; vertical-align: super; white-space: nowrap; }
+    .hero-note { font-size: 10px; color: var(--color-text-secondary); line-height: 0; font-weight: 400; letter-spacing: 0; vertical-align: super; white-space: nowrap; cursor: pointer; transition: color 120ms ease; }
+    .hero-note:hover, .hero-note:focus { color: var(--color-text-primary); }
+    .hero-note:focus-visible { outline: 1px solid currentColor; outline-offset: 2px; }
+
+    @media (hover: none), (pointer: coarse) {
+      .hero-note { cursor: default; }
+      .hero-note:hover { color: var(--color-text-secondary); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #logo-container, .hero-logo-sequence { transition: none; }
+      .hero-logo-sequence.is-settled { animation: none; }
+    }
 
     /* --- 2. 作品宫格核心逻辑 --- */
     .bento-grid {
@@ -160,12 +180,13 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
   <section class="hero-section">
     <div class="hero-container">
       <div class="hero-logo-box">
-        <div id="logo-container" style="width: 100%; height: 100%;"></div>
+        <div id="logo-container"></div>
+        <img class="hero-logo-sequence" alt="" aria-hidden="true" decoding="async" />
       </div>
       <div class="hero-text-content">
         <h1 class="hero-title">NIMO</h1>
         <p class="hero-desc">
-          Focusing on digital experience <span class="hero-annotated">design<sup class="hero-note">01 系统体验设计</sup></span>, creative <span class="hero-annotated">exploration<sup class="hero-note">02 创意视觉</sup></span>, and AI-native product <span class="hero-annotated">development<sup class="hero-note">03 产品开发</sup></span>.
+          Focusing on digital experience <span class="hero-annotated">design<sup class="hero-note" role="button" tabindex="0" data-logo-target="4" aria-controls="logo-container">01 系统体验设计</sup></span>, creative <span class="hero-annotated">exploration<sup class="hero-note" role="button" tabindex="0" data-logo-target="3" aria-controls="logo-container">02 创意视觉</sup></span>, and AI-native product <span class="hero-annotated">development<sup class="hero-note" role="button" tabindex="0" data-logo-target="5" aria-controls="logo-container">03 产品开发</sup></span>.
         </p>
       </div>
     </div>
@@ -217,13 +238,182 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
   <script>
     // light 版只含 svg 渲染器、不含 expressions（logodata.json 未使用 expressions），不依赖 eval
     import lottie from 'lottie-web/build/player/lottie_light';
+
     const logoContainer = document.getElementById('logo-container');
-    if (logoContainer) {
-      lottie.loadAnimation({ 
-        container: logoContainer, 
-        renderer: 'svg', loop: true, autoplay: true, 
-        path: '/images/data/logodata.json' 
+    const logoBox = document.querySelector<HTMLElement>('.hero-logo-box');
+    const sequenceImage = document.querySelector<HTMLImageElement>('.hero-logo-sequence');
+    const notes = document.querySelectorAll<HTMLElement>('.hero-note[data-logo-target]');
+
+    if (logoContainer && logoBox && sequenceImage) {
+      const animation = lottie.loadAnimation({
+        container: logoContainer,
+        renderer: 'svg',
+        loop: true,
+        autoplay: true,
+        path: '/images/data/logodata.json'
       });
+      const frameSources = [
+        '/images/logo-sequence/brand-1.jpg',
+        '/images/logo-sequence/brand-2.png',
+        '/images/logo-sequence/brand-3.png',
+        '/images/logo-sequence/brand-4.png',
+        '/images/logo-sequence/brand-5.png'
+      ];
+      const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const frameDelay = 80;
+      const restoreDelay = 120;
+      let generation = 0;
+      let sequenceController: AbortController | null = null;
+      let restoreTimer: number | null = null;
+      let hoveredNote: HTMLElement | null = null;
+      let focusedNote: HTMLElement | null = null;
+
+      let frameLoads: Promise<boolean>[] | null = null;
+
+      const ensureFrameLoads = () => {
+        if (frameLoads) return frameLoads;
+
+        frameLoads = frameSources.map((source) => new Promise<boolean>((resolve) => {
+          const image = new Image();
+          image.decoding = 'async';
+          image.onload = async () => {
+            try {
+              await image.decode();
+            } catch {
+              // The loaded image remains safe to display when decode() is unavailable.
+            }
+            resolve(true);
+          };
+          image.onerror = () => resolve(false);
+          image.src = source;
+        }));
+        return frameLoads;
+      };
+
+      const cancelRestore = () => {
+        if (restoreTimer !== null) {
+          window.clearTimeout(restoreTimer);
+          restoreTimer = null;
+        }
+      };
+
+      const waitForFrame = (signal: AbortSignal) => new Promise<boolean>((resolve) => {
+        let timer: number;
+        const onAbort = () => {
+          window.clearTimeout(timer);
+          resolve(false);
+        };
+        timer = window.setTimeout(() => {
+          signal.removeEventListener('abort', onAbort);
+          resolve(true);
+        }, frameDelay);
+        signal.addEventListener('abort', onAbort, { once: true });
+      });
+
+      const showFrame = (frame: number) => {
+        sequenceImage.classList.remove('is-settled');
+        sequenceImage.src = frameSources[frame - 1];
+      };
+
+      const restoreLottie = () => {
+        generation += 1;
+        sequenceController?.abort();
+        sequenceController = null;
+        sequenceImage.classList.remove('is-settled');
+        logoBox.classList.remove('is-sequence-active');
+        animation.play();
+        restoreTimer = null;
+      };
+
+      const startSequence = async (target: number) => {
+        if (!finePointer.matches) return;
+
+        cancelRestore();
+        generation += 1;
+        const currentGeneration = generation;
+        sequenceController?.abort();
+        sequenceController = new AbortController();
+        const { signal } = sequenceController;
+        const loads = ensureFrameLoads();
+        const firstFrameIndex = reducedMotion.matches ? target - 1 : 0;
+
+        if (!(await loads[firstFrameIndex])) {
+          if (!signal.aborted && currentGeneration === generation) restoreLottie();
+          return;
+        }
+        if (signal.aborted || currentGeneration !== generation) return;
+
+        showFrame(reducedMotion.matches ? target : 1);
+        logoBox.classList.add('is-sequence-active');
+        animation.pause();
+
+        if (reducedMotion.matches) return;
+
+        const frames = [1, 2, 3, 4, 5, ...Array.from({ length: target }, (_, index) => index + 1)];
+        for (const frame of frames.slice(1)) {
+          if (!(await waitForFrame(signal))) return;
+          if (!(await loads[frame - 1])) {
+            if (!signal.aborted && currentGeneration === generation) restoreLottie();
+            return;
+          }
+          if (signal.aborted || currentGeneration !== generation) return;
+          showFrame(frame);
+        }
+
+        sequenceImage.classList.add('is-settled');
+      };
+
+      const scheduleRestore = () => {
+        if (hoveredNote || focusedNote) return;
+        cancelRestore();
+        restoreTimer = window.setTimeout(restoreLottie, restoreDelay);
+      };
+
+      const targetFor = (note: HTMLElement) => Number(note.dataset.logoTarget);
+
+      const handleFinePointerChange = () => {
+        if (finePointer.matches) {
+          void Promise.all(ensureFrameLoads());
+          return;
+        }
+
+        hoveredNote = null;
+        focusedNote = null;
+        cancelRestore();
+        restoreLottie();
+      };
+
+      if (finePointer.matches) void Promise.all(ensureFrameLoads());
+      finePointer.addEventListener('change', handleFinePointerChange);
+
+      notes.forEach((note) => {
+        note.addEventListener('pointerenter', () => {
+          if (!finePointer.matches) return;
+          hoveredNote = note;
+          void startSequence(targetFor(note));
+        });
+        note.addEventListener('pointerleave', () => {
+          if (hoveredNote === note) hoveredNote = null;
+          scheduleRestore();
+        });
+        note.addEventListener('focus', () => {
+          if (!finePointer.matches) return;
+          focusedNote = note;
+          void startSequence(targetFor(note));
+        });
+        note.addEventListener('blur', () => {
+          if (focusedNote === note) focusedNote = null;
+          scheduleRestore();
+        });
+      });
+
+      window.addEventListener('pagehide', () => {
+        cancelRestore();
+        sequenceController?.abort();
+        finePointer.removeEventListener('change', handleFinePointerChange);
+        animation.destroy();
+      }, { once: true });
     }
   </script>
 </BaseLayout>

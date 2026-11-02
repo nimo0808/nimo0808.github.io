@@ -100,6 +100,14 @@ function init(
   const emptyButtons = Array.from(
     emptyState.querySelectorAll<HTMLButtonElement>('[data-empty-question]'),
   );
+  const emptyImagesReady = Promise.all(
+    emptyButtons.map((button) => {
+      const image = button.querySelector('img');
+      return image instanceof HTMLImageElement && typeof image.decode === 'function'
+        ? image.decode().catch(() => undefined)
+        : Promise.resolve();
+    }),
+  );
   let pending = false;
   let transitioning = false;
   let emptyShowFrame: number | undefined;
@@ -113,6 +121,17 @@ function init(
   };
 
   const scrollToBottom = () => window.scrollTo(0, document.body.scrollHeight);
+
+  const waitForAnimationFrames = (count: number): Promise<void> => new Promise((resolve) => {
+    const next = (remaining: number) => {
+      if (remaining <= 0) {
+        resolve();
+        return;
+      }
+      window.requestAnimationFrame(() => next(remaining - 1));
+    };
+    next(count);
+  });
 
   const showEmptyState = () => {
     if (container.childElementCount > 0) return;
@@ -137,6 +156,16 @@ function init(
     }
 
     const shouldAnimate = animate && !reducedMotion.matches;
+    if (shouldAnimate) {
+      // Start decoding on init and wait here before taking FLIP snapshots. Keeping opacity inline also
+      // prevents the temporary disabled state from dimming the scatter while decode is still pending.
+      for (const button of emptyButtons) {
+        button.style.opacity = '1';
+        button.style.willChange = 'transform';
+      }
+      await emptyImagesReady;
+    }
+
     const startRects = shouldAnimate
       ? emptyButtons.map((button) => button.getBoundingClientRect())
       : [];
@@ -162,7 +191,6 @@ function init(
       button.style.animation = 'none';
       button.style.transition = 'none';
       button.style.transformOrigin = 'center center';
-      button.style.willChange = 'transform';
       button.style.transform = inverse;
       return inverse;
     });
@@ -189,14 +217,36 @@ function init(
 
     await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
 
+    // Persist the exact final pixels before changing state. Mobile WebKit can otherwise paint the
+    // disabled compact style between removing a fill animation and enabling the buttons again.
+    for (const button of emptyButtons) {
+      button.style.transform = 'translate3d(0, 0, 0) scale(1, 1)';
+      button.style.opacity = '1';
+    }
     emptyState.dataset.state = 'compact';
-    for (const animation of animations) animation.cancel();
+
+    // Let the compact layout settle while the finished animations still own the same final pixels.
+    await waitForAnimationFrames(2);
+    for (const animation of animations) {
+      try {
+        animation.commitStyles?.();
+      } catch {
+        // Safari versions without a usable commitStyles implementation keep the explicit inline final style.
+      }
+      animation.cancel();
+    }
+
+    // Hand transform ownership back to compact CSS while will-change keeps the layer alive, then
+    // demote the temporary layers only after the equivalent CSS frame has painted.
     for (const button of emptyButtons) {
       button.style.removeProperty('animation');
       button.style.removeProperty('transition');
+      button.style.removeProperty('transform');
+    }
+    await waitForAnimationFrames(2);
+    for (const button of emptyButtons) {
       button.style.removeProperty('transform-origin');
       button.style.removeProperty('will-change');
-      button.style.removeProperty('transform');
     }
   };
 
@@ -344,6 +394,7 @@ function init(
         await dockEmptyState(true);
       } finally {
         setTransitioning(false);
+        for (const button of emptyButtons) button.style.removeProperty('opacity');
       }
     }
 
