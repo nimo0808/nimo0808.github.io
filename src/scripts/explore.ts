@@ -101,8 +101,8 @@ function init(
     emptyState.querySelectorAll<HTMLButtonElement>('[data-empty-question]'),
   );
   let pending = false;
+  let transitioning = false;
   let emptyShowFrame: number | undefined;
-  let emptyHideTimer: number | undefined;
 
   const saveChat = () => {
     try {
@@ -116,10 +116,6 @@ function init(
 
   const showEmptyState = () => {
     if (container.childElementCount > 0) return;
-    if (emptyHideTimer !== undefined) {
-      window.clearTimeout(emptyHideTimer);
-      emptyHideTimer = undefined;
-    }
     if (emptyShowFrame !== undefined) window.cancelAnimationFrame(emptyShowFrame);
     emptyState.hidden = false;
     emptyState.inert = false;
@@ -133,24 +129,91 @@ function init(
     });
   };
 
-  const hideEmptyState = () => {
+  const dockEmptyState = async (animate: boolean): Promise<void> => {
+    if (emptyState.dataset.state === 'compact') return;
     if (emptyShowFrame !== undefined) {
       window.cancelAnimationFrame(emptyShowFrame);
       emptyShowFrame = undefined;
     }
-    if (emptyHideTimer !== undefined) window.clearTimeout(emptyHideTimer);
-    emptyState.dataset.state = 'hidden';
-    emptyState.inert = true;
-    emptyState.setAttribute('aria-hidden', 'true');
-    if (emptyState.hidden || reducedMotion.matches) {
-      emptyState.hidden = true;
-      emptyHideTimer = undefined;
-      return;
+
+    const shouldAnimate = animate && !reducedMotion.matches;
+    const startRects = shouldAnimate
+      ? emptyButtons.map((button) => button.getBoundingClientRect())
+      : [];
+
+    emptyState.hidden = false;
+    emptyState.inert = false;
+    emptyState.setAttribute('aria-hidden', 'false');
+    emptyState.dataset.state = shouldAnimate ? 'transitioning' : 'compact';
+    container.prepend(emptyState);
+
+    if (!shouldAnimate) return;
+
+    const endRects = emptyButtons.map((button) => button.getBoundingClientRect());
+    const inverseTransforms = emptyButtons.map((button, index) => {
+      const start = startRects[index];
+      const end = endRects[index];
+      if (!start || !end || end.width === 0 || end.height === 0) return null;
+      const startCenterX = start.left + start.width / 2;
+      const startCenterY = start.top + start.height / 2;
+      const endCenterX = end.left + end.width / 2;
+      const endCenterY = end.top + end.height / 2;
+      const inverse = `translate3d(${startCenterX - endCenterX}px, ${startCenterY - endCenterY}px, 0) scale(${start.width / end.width}, ${start.height / end.height})`;
+      button.style.animation = 'none';
+      button.style.transition = 'none';
+      button.style.transformOrigin = 'center center';
+      button.style.willChange = 'transform';
+      button.style.transform = inverse;
+      return inverse;
+    });
+
+    // Flush the inverse transforms before WAAPI starts, so the first painted frame stays at the scatter positions.
+    for (const button of emptyButtons) window.getComputedStyle(button).transform;
+
+    const animations = emptyButtons.flatMap((button, index) => {
+      const inverse = inverseTransforms[index];
+      if (!inverse) return [];
+      return [button.animate(
+        [
+          { transform: inverse, opacity: 1 },
+          { transform: 'translate3d(0, 0, 0) scale(1, 1)', opacity: 1 },
+        ],
+        {
+          duration: 700,
+          delay: index * 20,
+          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+          fill: 'both',
+        },
+      )];
+    });
+
+    await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
+
+    emptyState.dataset.state = 'compact';
+    for (const animation of animations) animation.cancel();
+    for (const button of emptyButtons) {
+      button.style.removeProperty('animation');
+      button.style.removeProperty('transition');
+      button.style.removeProperty('transform-origin');
+      button.style.removeProperty('will-change');
+      button.style.removeProperty('transform');
     }
-    emptyHideTimer = window.setTimeout(() => {
-      emptyState.hidden = true;
-      emptyHideTimer = undefined;
-    }, 220);
+  };
+
+  const updateInteractionState = () => {
+    input.disabled = transitioning;
+    btn.disabled = pending || transitioning;
+    for (const button of emptyButtons) button.disabled = pending || transitioning;
+  };
+
+  const setTransitioning = (value: boolean) => {
+    transitioning = value;
+    updateInteractionState();
+  };
+
+  const setPending = (value: boolean) => {
+    pending = value;
+    updateInteractionState();
   };
 
   function appendUserBlock(text: string): { unit: HTMLElement; side: HTMLElement } {
@@ -273,9 +336,17 @@ function init(
 
   async function submitQuestion(text: string) {
     const query = text.trim().slice(0, MAX_MESSAGE_LENGTH);
-    if (!query || pending) return;
+    if (!query || pending || transitioning) return;
 
-    hideEmptyState();
+    if (emptyState.dataset.state !== 'compact') {
+      setTransitioning(true);
+      try {
+        await dockEmptyState(true);
+      } finally {
+        setTransitioning(false);
+      }
+    }
+
     const block = appendUserBlock(query);
     input.value = '';
     scrollToBottom();
@@ -289,14 +360,12 @@ function init(
     const loadingIndicator = createEl('div', 'thinking-status');
     loadingIndicator.textContent = 'thinking...';
     block.side.appendChild(loadingIndicator);
-    pending = true;
-    btn.disabled = true;
+    setPending(true);
 
     const result = await requestAnswer(endpoint, query);
 
     loadingIndicator.remove();
-    pending = false;
-    btn.disabled = false;
+    setPending(false);
 
     if (result.ok) {
       chatHistory.push({ role: 'user', content: query }, { role: 'assistant', content: result.reply });
@@ -330,7 +399,7 @@ function init(
   if (container.childElementCount === 0) {
     showEmptyState();
   } else {
-    hideEmptyState();
+    dockEmptyState(false);
   }
 }
 

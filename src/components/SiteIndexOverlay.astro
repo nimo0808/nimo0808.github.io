@@ -167,7 +167,8 @@ const experiences = [
     max-width: 100%;
     overflow-wrap: anywhere;
     font-family: 'Inter', sans-serif;
-    font-size: clamp(28px, 3.8vw, 54px);
+    /* 全宽度连续缩放：1440px→56px，1000px→46px，768px→41px，≤640px 保持 38px */
+    font-size: clamp(38px, calc(2.25vw + 23.6px), 56px);
     font-weight: 700;
     line-height: 1;
     letter-spacing: -0.035em;
@@ -268,11 +269,6 @@ const experiences = [
       gap: 8px 10px;
     }
 
-    .project-index-title {
-      font-size: clamp(28px, 8.8vw, 40px);
-      line-height: 1;
-    }
-
     .project-index-meta {
       gap: 7px;
       padding-top: 1px;
@@ -310,6 +306,10 @@ const experiences = [
     const firstProjectLink = overlay.querySelector<HTMLAnchorElement>('[data-site-index-project]');
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     let closeTimer: number | undefined;
+    // 标签页标题：索引打开时显示 Home，关闭后恢复当前页面标题
+    const pageTitle = document.title;
+    const siteName = document.querySelector('title')?.dataset.siteName;
+    const homeTitle = siteName ? `Home | ${siteName}` : 'Home';
 
     const setButtonState = (open: boolean) => {
       toggleButton.setAttribute('aria-expanded', String(open));
@@ -325,6 +325,7 @@ const experiences = [
       overlay.inert = false;
       overlay.setAttribute('aria-hidden', 'false');
       document.body.classList.add('site-index-open');
+      document.title = homeTitle;
       setButtonState(true);
 
       window.requestAnimationFrame(() => {
@@ -339,6 +340,7 @@ const experiences = [
       overlay.inert = true;
       overlay.setAttribute('aria-hidden', 'true');
       document.body.classList.remove('site-index-open');
+      document.title = pageTitle;
       setButtonState(false);
       if (returnFocus) toggleButton.focus({ preventScroll: true });
 

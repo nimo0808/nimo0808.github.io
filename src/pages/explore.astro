@@ -15,7 +15,7 @@ const projectCards = (await getSortedProjects()).map((p) => ({
 
 <BaseLayout title="Explore" activeTab="explore">
   <style is:global>
-    .chat-container { max-width: 900px; margin: 0 auto; padding: 150px 40px 250px 40px; color: var(--color-text-primary); }
+    .chat-container { max-width: 900px; margin: 0 auto; padding: 150px 40px 220px 40px; color: var(--color-text-primary); }
     .message-unit { margin-bottom: 80px; text-align: left; }
     .user-question { color: var(--color-text-weak) !important; font-size: 14px; margin-bottom: 20px; font-weight: 900; letter-spacing: 1px; display: block; overflow-wrap: anywhere; }
     .thinking-status { font-size: 10px; color: var(--color-text-weak) !important; letter-spacing: 2px; margin-bottom: 15px; animation: pulse 1.5s infinite; }
@@ -37,24 +37,45 @@ const projectCards = (await getSortedProjects()).map((p) => ({
     .card-title { font-size: 11px; font-weight: 700; line-height: 1.3; color: var(--color-text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .card-year { font-size: 9px; color: var(--color-text-muted); margin-top: 4px; }
 
-    .explore-empty { position: fixed; inset: 80px 0 175px; z-index: 1; overflow: hidden; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 220ms ease, visibility 0s linear 220ms; }
+    /* 素材区：导航(80px)与输入区(145px)之间 */
+    .explore-empty { position: fixed; inset: 80px 0 145px; z-index: 1; overflow: hidden; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 220ms ease, visibility 0s linear 220ms; }
     .explore-empty[hidden] { display: none; }
     .explore-empty[data-state='visible'] { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
-    .explore-empty-stage { position: relative; width: min(100%, 1100px); height: 100%; margin: 0 auto; }
-    .explore-empty-button { position: absolute; display: block; margin: 0; padding: 0; appearance: none; -webkit-appearance: none; border: 0; outline: 0; background: transparent; box-shadow: none; color: inherit; line-height: 0; cursor: pointer; filter: none; transform: translateY(0) scale(1); transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), filter 220ms ease; }
-    .explore-empty-button img { display: block; width: 100%; height: auto; max-width: none; user-select: none; -webkit-user-drag: none; filter: none; }
+    /* 首次提问后复用同一组按钮，作为消息流首项收拢到正文左上方 */
+    .explore-empty:is([data-state='transitioning'], [data-state='compact']) { position: relative; inset: auto; width: 100%; height: 55px; margin: 0 0 30px; overflow: visible; opacity: 1; visibility: visible; pointer-events: auto; transition: none; }
+    /* 舞台高度保持输入区调整前的尺寸，并在新空间内垂直居中；作为容器查询基准让素材随舞台缩放 */
+    .explore-empty-stage { position: relative; width: min(100%, 1100px); height: calc(100% - 30px); margin: 15px auto 0; container-type: size; }
+    .explore-empty-button { position: absolute; display: block; margin: 0; padding: 0; appearance: none; -webkit-appearance: none; border: 0; outline: 0; background: transparent; box-shadow: none; color: inherit; line-height: 0; cursor: pointer; filter: none; transform: translateY(0) scale(1); transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), filter 220ms ease, opacity 180ms ease; }
+    .explore-empty-button img { display: block; width: 100%; height: auto; max-width: none; user-select: none; -webkit-user-drag: none; object-fit: contain; filter: none; }
     .explore-empty[data-state='visible'] .explore-empty-button { animation: explore-item-in 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards; animation-delay: var(--enter-delay, 0ms); }
     .explore-empty-button:hover { transform: translateY(-4px) scale(1.015); filter: drop-shadow(0 9px 9px rgb(0 0 0 / 14%)); }
     .explore-empty-button:focus-visible { transform: translateY(-2px) scale(1.01); filter: drop-shadow(0 0 1px var(--color-focus-ring)) drop-shadow(0 7px 8px rgb(0 0 0 / 12%)); }
-    .explore-empty-button--person { left: 50%; top: 50%; width: 182px; margin-top: -175px; margin-left: -91px; --enter-delay: 90ms; }
-    .explore-empty-button--shirt { top: calc(27.925% - 26px); left: calc(3% + 11px); width: 189px; --enter-delay: 20ms; }
-    .explore-empty-button--camera { top: calc(28.7% - 25.5px); right: calc(2% + 11px); width: 198px; --enter-delay: 55ms; }
-    .explore-empty-button--basketball { bottom: calc(20.925% - 26px); left: calc(7% + 11px); width: 189px; --enter-delay: 125ms; }
-    .explore-empty-button--drink { right: calc(6% + 10px); bottom: calc(20.7% - 26.5px); width: 185px; --enter-delay: 160ms; }
+    .explore-empty-button:disabled { cursor: default; opacity: 0.55; }
+    .explore-empty[data-state='transitioning'] .explore-empty-button { animation: none; transition: none; transform: none; filter: none; opacity: 1; pointer-events: none; }
+    .explore-empty:is([data-state='transitioning'], [data-state='compact']) .explore-empty-stage { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; height: 55px; margin: 0; container-type: normal; }
+    .explore-empty:is([data-state='transitioning'], [data-state='compact']) .explore-empty-button { position: relative; inset: auto; flex: 0 0 51px; width: 51px; height: 51px; margin: 0; }
+    .explore-empty:is([data-state='transitioning'], [data-state='compact']) .explore-empty-button--person { flex-basis: 29px; width: 29px; }
+    .explore-empty:is([data-state='transitioning'], [data-state='compact']) .explore-empty-button img { width: 100%; height: 100%; }
+    .explore-empty[data-state='compact'] .explore-empty-button:not(:disabled):hover { transform: translateY(-2px) scale(1.015); filter: drop-shadow(0 6px 7px rgb(0 0 0 / 14%)); }
+    .explore-empty[data-state='compact'] .explore-empty-button:focus-visible { transform: translateY(-1px) scale(1.01); }
+    /* --w 素材宽度、--o 垂直偏移。基准 1440×900（舞台 1100×645）下为原像素值，舞台更矮或更窄时等比缩小 */
+    .explore-empty-button--person { --w: 182px; left: 50%; top: 50%; width: var(--w); margin-top: calc(var(--w) * -0.9615); margin-left: calc(var(--w) * -0.5); --enter-delay: 90ms; }
+    .explore-empty-button--shirt { --w: 189px; --o: 26px; top: calc(27.925% - var(--o)); left: calc(3% + 11px); width: var(--w); --enter-delay: 20ms; }
+    .explore-empty-button--camera { --w: 198px; --o: 25.5px; top: calc(28.7% - var(--o)); right: calc(2% + 11px); width: var(--w); --enter-delay: 55ms; }
+    .explore-empty-button--basketball { --w: 189px; --o: 26px; bottom: calc(20.925% - var(--o)); left: calc(7% + 11px); width: var(--w); --enter-delay: 125ms; }
+    .explore-empty-button--drink { --w: 185px; --o: 26.5px; right: calc(6% + 10px); bottom: calc(20.7% - var(--o)); width: var(--w); --enter-delay: 160ms; }
+    @supports (width: 1cqh) {
+      .explore-empty-button--person { --w: min(182px, 28.22cqh, 16.55cqw); }
+      .explore-empty-button--shirt { --w: min(189px, 29.3cqh, 17.18cqw); --o: min(26px, 4.03cqh); }
+      .explore-empty-button--camera { --w: min(198px, 30.7cqh, 18cqw); --o: min(25.5px, 3.95cqh); }
+      .explore-empty-button--basketball { --w: min(189px, 29.3cqh, 17.18cqw); --o: min(26px, 4.03cqh); }
+      .explore-empty-button--drink { --w: min(185px, 28.68cqh, 16.82cqw); --o: min(26.5px, 4.11cqh); }
+    }
 
-    .input-wrapper { position: fixed; bottom: 0; left: 0; z-index: 10; width: 100%; background: var(--color-page-bg); padding: 52px 0 58.5px 0; border-top: 1px solid var(--color-border-subtle); transition: background-color 180ms ease, border-color 180ms ease; }
+    /* 分割线 → 输入框 42px，输入框 60px，输入框 → 屏幕底部 42px（总高 145px） */
+    .input-wrapper { position: fixed; bottom: 0; left: 0; z-index: 10; width: 100%; background: var(--color-page-bg); padding: 42px 0 42px 0; border-top: 1px solid var(--color-border-subtle); transition: background-color 180ms ease, border-color 180ms ease; }
     .input-box { max-width: 800px; margin: 0 auto; padding: 0 40px; position: relative; box-sizing: border-box; }
-    #userInput { width: 100%; background: var(--color-input-bg); color: var(--color-text-primary); border: none; border-radius: 40px; padding: 22px 80px 22px 35px; font-size: 16px; outline: none; box-sizing: border-box; transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease; }
+    #userInput { width: 100%; background: var(--color-input-bg); color: var(--color-text-primary); border: none; border-radius: 40px; height: 60px; padding: 0 80px 0 35px; font-size: 16px; outline: none; box-sizing: border-box; transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease; }
     #userInput::placeholder { color: var(--color-input-placeholder); opacity: 1; }
     #userInput:focus-visible { box-shadow: inset 0 0 0 1px rgb(0 0 0 / 3%); }
     #sendBtn { position: absolute; right: 55px; top: 50%; transform: translateY(-50%); background: var(--color-button-bg); color: var(--color-button-text); border: none; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: background-color 180ms ease, color 180ms ease, opacity 180ms ease; }
@@ -76,11 +97,20 @@ const projectCards = (await getSortedProjects()).map((p) => ({
     }
 
     @media (max-width: 768px) {
-      .explore-empty-button--person { width: 118px; margin-top: -116px; margin-left: -59px; }
-      .explore-empty-button--shirt { top: calc(26.375% - 21.7px); left: 7px; width: 122px; }
-      .explore-empty-button--camera { top: calc(26.375% - 20.8px); right: 7px; width: 122px; }
-      .explore-empty-button--basketball { bottom: calc(21.375% - 1.7px); left: 7px; width: 131px; }
-      .explore-empty-button--drink { right: 7px; bottom: calc(21.375% - 4.8px); width: 131px; }
+      .explore-empty:is([data-state='transitioning'], [data-state='compact']) .explore-empty-stage { gap: 8px; }
+      /* 手机基准 390×844（舞台 390×589）下为原像素值，更矮或更窄时等比缩小 */
+      .explore-empty-button--person { --w: 118px; margin-top: calc(var(--w) * -0.983); }
+      .explore-empty-button--shirt { --w: 122px; --o: 21.7px; top: calc(26.375% - var(--o)); left: 7px; }
+      .explore-empty-button--camera { --w: 122px; --o: 20.8px; top: calc(26.375% - var(--o)); right: 7px; }
+      .explore-empty-button--basketball { --w: 131px; --o: 1.7px; bottom: calc(21.375% - var(--o)); left: 7px; }
+      .explore-empty-button--drink { --w: 131px; --o: 4.8px; right: 7px; bottom: calc(21.375% - var(--o)); }
+      @supports (width: 1cqh) {
+        .explore-empty-button--person { --w: min(118px, 20.03cqh, 30.26cqw); }
+        .explore-empty-button--shirt { --w: min(122px, 20.71cqh, 31.28cqw); --o: min(21.7px, 3.68cqh); }
+        .explore-empty-button--camera { --w: min(122px, 20.71cqh, 31.28cqw); --o: min(20.8px, 3.53cqh); }
+        .explore-empty-button--basketball { --w: min(131px, 22.24cqh, 33.59cqw); --o: min(1.7px, 0.29cqh); }
+        .explore-empty-button--drink { --w: min(131px, 22.24cqh, 33.59cqw); --o: min(4.8px, 0.81cqh); }
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {

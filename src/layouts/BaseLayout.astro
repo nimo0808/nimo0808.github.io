@@ -50,7 +50,11 @@ const csp = [
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
     {!indexable && <meta name="robots" content="noindex" />}
-    <title>{title} | {siteName}</title>
+    <title data-site-name={siteName}>{title} | {siteName}</title>
+    <!-- ?v= 用于更换图标后强制浏览器刷新缓存 -->
+    <link rel="icon" type="image/png" href="/favicon.png?v=2" />
+    <link rel="icon" href="/favicon.ico?v=2" sizes="any" />
+    <link rel="apple-touch-icon" href="/favicon.png?v=2" />
     <meta name="description" content={description} />
     <style is:global>
       :root {

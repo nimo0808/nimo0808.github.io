@@ -11,7 +11,7 @@ const placeholderCount = Math.max(0, minSlots - realProjects.length);
 const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProjects.length + i);
 ---
 
-<BaseLayout title="Home" activeTab="work">
+<BaseLayout title="Work" activeTab="work">
   <style>
     /* --- 1. Hero 品牌区 --- */
     .hero-section {
@@ -145,7 +145,8 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
 
     @media (max-width: 768px) {
       .hero-section { padding: 80px 20px 100px 20px; }
-      .hero-container { flex-direction: column; text-align: center; gap: 40px; }
+      /* gap 8px：Logo 图形可见底边 → NIMO 字母顶部的视觉距离约 100px（动画画布底部自带约 85px 留白） */
+      .hero-container { flex-direction: column; text-align: center; gap: 8px; }
       /* 手机端 Logo 动画等比缩小（容器 350px → 290px，可见 Logo 约 158px → 131px） */
       .hero-logo-box { width: min(290px, calc(100vw - 40px)); height: min(290px, calc(100vw - 40px)); }
       .site-footer { padding: 80px 20px; margin-top: 100px; }
