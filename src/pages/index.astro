@@ -253,11 +253,11 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
         path: '/images/data/logodata.json'
       });
       const frameSources = [
-        '/images/logo-sequence/brand-1.jpg',
-        '/images/logo-sequence/brand-2.png',
-        '/images/logo-sequence/brand-3.png',
-        '/images/logo-sequence/brand-4.png',
-        '/images/logo-sequence/brand-5.png'
+        '/images/logo-sequence/brand-1-cc0af93c.jpg',
+        '/images/logo-sequence/brand-2-e3205caa.webp',
+        '/images/logo-sequence/brand-3-8984d76d.webp',
+        '/images/logo-sequence/brand-4-6b71845e.webp',
+        '/images/logo-sequence/brand-5-d2462d72.webp'
       ];
       const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -278,12 +278,16 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
           const image = new Image();
           image.decoding = 'async';
           image.onload = async () => {
+            if (typeof image.decode !== 'function') {
+              resolve(true);
+              return;
+            }
             try {
               await image.decode();
+              resolve(true);
             } catch {
-              // The loaded image remains safe to display when decode() is unavailable.
+              resolve(false);
             }
-            resolve(true);
           };
           image.onerror = () => resolve(false);
           image.src = source;
@@ -326,7 +330,7 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
         restoreTimer = null;
       };
 
-      const startSequence = async (target: number) => {
+      const startSequence = async (target: number, note: HTMLElement) => {
         if (!finePointer.matches) return;
 
         cancelRestore();
@@ -335,14 +339,14 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
         sequenceController?.abort();
         sequenceController = new AbortController();
         const { signal } = sequenceController;
-        const loads = ensureFrameLoads();
-        const firstFrameIndex = reducedMotion.matches ? target - 1 : 0;
+        const frameResults = await Promise.all(ensureFrameLoads());
+        const noteIsActive = hoveredNote === note || focusedNote === note;
 
-        if (!(await loads[firstFrameIndex])) {
-          if (!signal.aborted && currentGeneration === generation) restoreLottie();
+        if (signal.aborted || currentGeneration !== generation || !noteIsActive) return;
+        if (!frameResults.every(Boolean)) {
+          restoreLottie();
           return;
         }
-        if (signal.aborted || currentGeneration !== generation) return;
 
         showFrame(reducedMotion.matches ? target : 1);
         logoBox.classList.add('is-sequence-active');
@@ -353,10 +357,6 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
         const frames = [1, 2, 3, 4, 5, ...Array.from({ length: target }, (_, index) => index + 1)];
         for (const frame of frames.slice(1)) {
           if (!(await waitForFrame(signal))) return;
-          if (!(await loads[frame - 1])) {
-            if (!signal.aborted && currentGeneration === generation) restoreLottie();
-            return;
-          }
           if (signal.aborted || currentGeneration !== generation) return;
           showFrame(frame);
         }
@@ -391,7 +391,7 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
         note.addEventListener('pointerenter', () => {
           if (!finePointer.matches) return;
           hoveredNote = note;
-          void startSequence(targetFor(note));
+          void startSequence(targetFor(note), note);
         });
         note.addEventListener('pointerleave', () => {
           if (hoveredNote === note) hoveredNote = null;
@@ -400,7 +400,7 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
         note.addEventListener('focus', () => {
           if (!finePointer.matches) return;
           focusedNote = note;
-          void startSequence(targetFor(note));
+          void startSequence(targetFor(note), note);
         });
         note.addEventListener('blur', () => {
           if (focusedNote === note) focusedNote = null;
