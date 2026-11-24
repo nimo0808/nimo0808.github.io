@@ -241,10 +241,11 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
 
     const logoContainer = document.getElementById('logo-container');
     const logoBox = document.querySelector<HTMLElement>('.hero-logo-box');
+    const heroSection = document.querySelector<HTMLElement>('.hero-section');
     const sequenceImage = document.querySelector<HTMLImageElement>('.hero-logo-sequence');
     const notes = document.querySelectorAll<HTMLElement>('.hero-note[data-logo-target]');
 
-    if (logoContainer && logoBox && sequenceImage) {
+    if (logoContainer && logoBox && heroSection && sequenceImage) {
       const animation = lottie.loadAnimation({
         container: logoContainer,
         renderer: 'svg',
@@ -261,13 +262,25 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
       ];
       const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-      const frameDelay = 80;
+      const connection = (navigator as Navigator & {
+        connection?: EventTarget & { saveData?: boolean; effectiveType?: string };
+      }).connection;
+      const desktopFrameDelay = 80;
+      const mobileFrameDelay = 120;
+      const mobileFinalDelay = 500;
       const restoreDelay = 120;
       let generation = 0;
       let sequenceController: AbortController | null = null;
       let restoreTimer: number | null = null;
       let hoveredNote: HTMLElement | null = null;
       let focusedNote: HTMLElement | null = null;
+      let lottieReady = false;
+      let heroIsVisible = false;
+      let destroyed = false;
+      let mobileState: 'idle' | 'qualifying' | 'loading' | 'playing' | 'done' = 'idle';
+      let mobileQualificationStartedAt = 0;
+      let mobileHasShownFrame = false;
+      let sequenceOwner: 'desktop' | 'mobile' | null = null;
 
       let frameLoads: Promise<boolean>[] | null = null;
 
@@ -302,7 +315,7 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
         }
       };
 
-      const waitForFrame = (signal: AbortSignal) => new Promise<boolean>((resolve) => {
+      const waitForDelay = (signal: AbortSignal, delay: number) => new Promise<boolean>((resolve) => {
         let timer: number;
         const onAbort = () => {
           window.clearTimeout(timer);
@@ -311,7 +324,7 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
         timer = window.setTimeout(() => {
           signal.removeEventListener('abort', onAbort);
           resolve(true);
-        }, frameDelay);
+        }, delay);
         signal.addEventListener('abort', onAbort, { once: true });
       });
 
@@ -320,17 +333,59 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
         sequenceImage.src = frameSources[frame - 1];
       };
 
-      const restoreLottie = () => {
+      const showLottie = (restartFromBeginning = false) => {
         generation += 1;
         sequenceController?.abort();
         sequenceController = null;
+        sequenceOwner = null;
         sequenceImage.classList.remove('is-settled');
         logoBox.classList.remove('is-sequence-active');
-        animation.play();
+        if (restartFromBeginning) animation.goToAndPlay(0, true);
+        else animation.play();
         restoreTimer = null;
       };
 
-      const startSequence = async (target: number, note: HTMLElement) => {
+      const mobileIsSuppressed = () => {
+        const effectiveType = connection?.effectiveType;
+        return reducedMotion.matches
+          || connection?.saveData === true
+          || effectiveType === 'slow-2g'
+          || effectiveType === '2g';
+      };
+
+      const mobileCanQualify = () => !destroyed
+        && lottieReady
+        && !finePointer.matches
+        && !mobileIsSuppressed()
+        && heroIsVisible
+        && document.visibilityState === 'visible';
+
+      const cancelMobileAuto = () => {
+        if (mobileState === 'idle' || mobileState === 'done') return;
+
+        const mustFinish = mobileHasShownFrame;
+        showLottie(true);
+        mobileQualificationStartedAt = 0;
+        mobileState = mustFinish ? 'done' : 'idle';
+      };
+
+      const reconcileMobileAuto = () => {
+        if (!mobileCanQualify()) {
+          cancelMobileAuto();
+          return;
+        }
+        if (mobileState !== 'idle') return;
+
+        generation += 1;
+        sequenceController?.abort();
+        sequenceController = null;
+        sequenceOwner = null;
+        mobileState = 'qualifying';
+        mobileQualificationStartedAt = performance.now();
+        animation.goToAndPlay(0, true);
+      };
+
+      const startDesktopSequence = async (target: number, note: HTMLElement) => {
         if (!finePointer.matches) return;
 
         cancelRestore();
@@ -338,13 +393,14 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
         const currentGeneration = generation;
         sequenceController?.abort();
         sequenceController = new AbortController();
+        sequenceOwner = 'desktop';
         const { signal } = sequenceController;
         const frameResults = await Promise.all(ensureFrameLoads());
         const noteIsActive = hoveredNote === note || focusedNote === note;
 
-        if (signal.aborted || currentGeneration !== generation || !noteIsActive) return;
+        if (signal.aborted || currentGeneration !== generation || !noteIsActive || !finePointer.matches) return;
         if (!frameResults.every(Boolean)) {
-          restoreLottie();
+          showLottie();
           return;
         }
 
@@ -356,42 +412,125 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
 
         const frames = [1, 2, 3, 4, 5, ...Array.from({ length: target }, (_, index) => index + 1)];
         for (const frame of frames.slice(1)) {
-          if (!(await waitForFrame(signal))) return;
-          if (signal.aborted || currentGeneration !== generation) return;
+          if (!(await waitForDelay(signal, desktopFrameDelay))) return;
+          if (signal.aborted || currentGeneration !== generation || !finePointer.matches) return;
           showFrame(frame);
         }
 
         sequenceImage.classList.add('is-settled');
       };
 
+      const startMobileSequence = async () => {
+        if (mobileState !== 'qualifying' || !mobileCanQualify()) return;
+
+        mobileState = 'loading';
+        generation += 1;
+        const currentGeneration = generation;
+        sequenceController?.abort();
+        sequenceController = new AbortController();
+        sequenceOwner = 'mobile';
+        const { signal } = sequenceController;
+        const frameResults = await Promise.all(ensureFrameLoads());
+
+        if (signal.aborted || currentGeneration !== generation || mobileState !== 'loading') return;
+        if (!mobileCanQualify() || !frameResults.every(Boolean)) {
+          if (!frameResults.every(Boolean)) {
+            mobileState = 'done';
+            showLottie(true);
+          } else {
+            cancelMobileAuto();
+          }
+          return;
+        }
+
+        mobileState = 'playing';
+        mobileHasShownFrame = true;
+        showFrame(1);
+        logoBox.classList.add('is-sequence-active');
+        animation.pause();
+
+        for (const frame of [2, 3, 4, 5]) {
+          if (!(await waitForDelay(signal, mobileFrameDelay))) return;
+          if (signal.aborted || currentGeneration !== generation || !mobileCanQualify()) return;
+          showFrame(frame);
+        }
+
+        if (!(await waitForDelay(signal, mobileFinalDelay))) return;
+        if (signal.aborted || currentGeneration !== generation || !mobileCanQualify()) return;
+
+        logoBox.classList.remove('is-sequence-active');
+        animation.goToAndPlay(0, true);
+        if (!(await waitForDelay(signal, restoreDelay))) return;
+        if (signal.aborted || currentGeneration !== generation) return;
+
+        sequenceController = null;
+        sequenceOwner = null;
+        mobileState = 'done';
+      };
+
+      const handleLoopComplete = () => {
+        if (mobileState !== 'qualifying' || !mobileCanQualify()) return;
+
+        const cycleDuration = animation.getDuration(false) * 1000;
+        const watchedDuration = performance.now() - mobileQualificationStartedAt;
+        if (watchedDuration + 100 < cycleDuration) {
+          mobileQualificationStartedAt = performance.now();
+          animation.goToAndPlay(0, true);
+          return;
+        }
+        void startMobileSequence();
+      };
+
+      const handleLottieReady = () => {
+        lottieReady = true;
+        reconcileMobileAuto();
+      };
+
       const scheduleRestore = () => {
         if (hoveredNote || focusedNote) return;
         cancelRestore();
-        restoreTimer = window.setTimeout(restoreLottie, restoreDelay);
+        restoreTimer = window.setTimeout(() => showLottie(), restoreDelay);
       };
 
       const targetFor = (note: HTMLElement) => Number(note.dataset.logoTarget);
 
       const handleFinePointerChange = () => {
+        hoveredNote = null;
+        focusedNote = null;
+        cancelRestore();
+        if (sequenceOwner === 'mobile' || mobileState === 'qualifying') cancelMobileAuto();
+        else showLottie(!finePointer.matches);
+
         if (finePointer.matches) {
           void Promise.all(ensureFrameLoads());
           return;
         }
-
-        hoveredNote = null;
-        focusedNote = null;
-        cancelRestore();
-        restoreLottie();
+        reconcileMobileAuto();
       };
 
-      if (finePointer.matches) void Promise.all(ensureFrameLoads());
+      const handleMobileConditionChange = () => reconcileMobileAuto();
+      const handleVisibilityChange = () => reconcileMobileAuto();
+
+      const heroObserver = new IntersectionObserver(([entry]) => {
+        heroIsVisible = Boolean(entry?.isIntersecting && entry.intersectionRatio >= 0.6);
+        reconcileMobileAuto();
+      }, { threshold: [0, 0.6] });
+
+      animation.addEventListener('DOMLoaded', handleLottieReady);
+      animation.addEventListener('loopComplete', handleLoopComplete);
+      heroObserver.observe(heroSection);
       finePointer.addEventListener('change', handleFinePointerChange);
+      reducedMotion.addEventListener('change', handleMobileConditionChange);
+      connection?.addEventListener('change', handleMobileConditionChange);
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      if (finePointer.matches) void Promise.all(ensureFrameLoads());
 
       notes.forEach((note) => {
         note.addEventListener('pointerenter', () => {
           if (!finePointer.matches) return;
           hoveredNote = note;
-          void startSequence(targetFor(note), note);
+          void startDesktopSequence(targetFor(note), note);
         });
         note.addEventListener('pointerleave', () => {
           if (hoveredNote === note) hoveredNote = null;
@@ -400,7 +539,7 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
         note.addEventListener('focus', () => {
           if (!finePointer.matches) return;
           focusedNote = note;
-          void startSequence(targetFor(note), note);
+          void startDesktopSequence(targetFor(note), note);
         });
         note.addEventListener('blur', () => {
           if (focusedNote === note) focusedNote = null;
@@ -409,9 +548,17 @@ const placeholders = Array.from({ length: placeholderCount }, (_, i) => realProj
       });
 
       window.addEventListener('pagehide', () => {
+        destroyed = true;
         cancelRestore();
         sequenceController?.abort();
+        sequenceController = null;
+        heroObserver.disconnect();
+        animation.removeEventListener('DOMLoaded', handleLottieReady);
+        animation.removeEventListener('loopComplete', handleLoopComplete);
         finePointer.removeEventListener('change', handleFinePointerChange);
+        reducedMotion.removeEventListener('change', handleMobileConditionChange);
+        connection?.removeEventListener('change', handleMobileConditionChange);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
         animation.destroy();
       }, { once: true });
     }
