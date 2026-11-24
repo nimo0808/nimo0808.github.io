@@ -121,7 +121,10 @@ const csp = [
       }
 
       /* 1. 核心：锁死滚动条宽度，无论内容长短，页面都不会左右晃动 */
-      html { scrollbar-gutter: stable; }
+      html {
+        scrollbar-gutter: stable;
+        background: var(--color-page-bg);
+      }
 
       body {
         font-family: 'Inter', sans-serif;
@@ -130,6 +133,30 @@ const csp = [
         color: var(--color-text-primary);
         -webkit-font-smoothing: antialiased;
         transition: background-color 180ms ease, color 180ms ease;
+      }
+
+      main[data-page-transition-content] {
+        animation: page-transition-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+      }
+
+      body.page-transition-leaving main[data-page-transition-content] {
+        animation: none;
+        opacity: 0;
+        transform: translateY(-5px);
+        transition:
+          opacity 160ms cubic-bezier(0.22, 1, 0.36, 1),
+          transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      @keyframes page-transition-enter {
+        from {
+          opacity: 0;
+          transform: translateY(7px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
       }
 
       /* 2. 统一 Nav：物理像素锁死 */
@@ -197,6 +224,13 @@ const csp = [
           animation-duration: 0.01ms !important;
           animation-iteration-count: 1 !important;
         }
+
+        main[data-page-transition-content] {
+          animation: none !important;
+          opacity: 1 !important;
+          transform: none !important;
+          transition: none !important;
+        }
       }
 
       @media (max-width: 768px) {
@@ -218,12 +252,15 @@ const csp = [
         <img src="/images/photo/Top bar icons.png" alt="" class="logo-img" />
       </button>
       <div class="nav-links">
-        <a href="/" class={activeTab === 'work' ? 'active' : ''}>Work</a>
-        <a href="/lab" class={activeTab === 'lab' ? 'active' : ''}>Lab</a>
-        <a href="/explore" class={activeTab === 'explore' ? 'active' : ''}>Explore</a>
+        <a href="/" class={activeTab === 'work' ? 'active' : ''} data-page-transition-nav>Work</a>
+        <a href="/lab" class={activeTab === 'lab' ? 'active' : ''} data-page-transition-nav>Lab</a>
+        <a href="/explore" class={activeTab === 'explore' ? 'active' : ''} data-page-transition-nav>Explore</a>
       </div>
     </nav>
     <SiteIndexOverlay />
-    <main><slot /></main>
+    <main data-page-transition-content={activeTab ? '' : undefined}><slot /></main>
+    <script>
+      import '../scripts/page-transitions';
+    </script>
   </body>
 </html>
