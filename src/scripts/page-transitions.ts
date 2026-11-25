@@ -39,6 +39,10 @@ document.addEventListener('click', (event) => {
 
   if (destinationPathname === currentPathname) {
     event.preventDefault();
+    // 索引打开时，点当前页的导航应关闭索引（由 SiteIndexOverlay 自己恢复标题、aria 和焦点）
+    if (document.body.classList.contains('site-index-open')) {
+      document.dispatchEvent(new CustomEvent('site-index:close'));
+    }
     return;
   }
 

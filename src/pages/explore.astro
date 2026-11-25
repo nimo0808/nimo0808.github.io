@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getSortedProjects } from '../lib/projects';
+import { EXPLORE_INTRO_TEXT } from '../data/explore-intro';
 
 // 只嵌入公开项目元数据，用于推荐卡片；不包含任何项目正文或个人资料。
 // AI 检索与回答全部在 Cloudflare Worker 中完成（见 /worker）。
@@ -48,9 +49,14 @@ const projectCards = (await getSortedProjects()).map((p) => ({
     .explore-empty-button { position: absolute; display: block; margin: 0; padding: 0; appearance: none; -webkit-appearance: none; border: 0; outline: 0; background: transparent; box-shadow: none; color: inherit; line-height: 0; cursor: pointer; filter: none; transform: translateY(0) scale(1); transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), filter 220ms ease, opacity 180ms ease; }
     .explore-empty-button img { display: block; width: 100%; height: auto; max-width: none; user-select: none; -webkit-user-drag: none; object-fit: contain; filter: none; }
     .explore-empty[data-state='visible'] .explore-empty-button { animation: explore-item-in 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards; animation-delay: var(--enter-delay, 0ms); }
+    /* 开场衔接：素材由脚本在 img 上做模糊到清晰的显现，取代容器淡入和按钮位移入场 */
+    .explore-empty[data-reveal='intro'] { transition: none; }
+    .explore-empty[data-reveal='intro'] .explore-empty-button { animation: none; }
     .explore-empty-button:hover { transform: translateY(-4px) scale(1.015); filter: drop-shadow(0 9px 9px rgb(0 0 0 / 14%)); }
     .explore-empty-button:focus-visible { transform: translateY(-2px) scale(1.01); filter: drop-shadow(0 0 1px var(--color-focus-ring)) drop-shadow(0 7px 8px rgb(0 0 0 / 12%)); }
     .explore-empty-button:disabled { cursor: default; opacity: 0.55; }
+    /* 开场超时后仍在加载的素材先不显示，decode 完成后去掉 data-pending 再单独入场 */
+    .explore-empty[data-state='visible'] .explore-empty-button[data-pending] { visibility: hidden; pointer-events: none; animation: none; }
     .explore-empty[data-state='transitioning'] .explore-empty-button { animation: none; transition: none; transform: none; filter: none; opacity: 1; pointer-events: none; }
     .explore-empty:is([data-state='transitioning'], [data-state='compact']) .explore-empty-stage { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; height: 55px; margin: 0; container-type: normal; }
     .explore-empty:is([data-state='transitioning'], [data-state='compact']) .explore-empty-button { position: relative; inset: auto; flex: 0 0 51px; width: 51px; height: 51px; margin: 0; }
@@ -71,6 +77,20 @@ const projectCards = (await getSortedProjects()).map((p) => ({
       .explore-empty-button--basketball { --w: min(189px, 29.3cqh, 17.18cqw); --o: min(26px, 4.03cqh); }
       .explore-empty-button--drink { --w: min(185px, 28.68cqh, 16.82cqw); --o: min(26.5px, 4.11cqh); }
     }
+
+    /* 加载开场：与素材区同一区域，文字静态居中；字号与颜色跟随 #userInput 的提示文字 */
+    .explore-intro { position: fixed; inset: 80px 0 145px; z-index: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; pointer-events: none; }
+    .explore-intro[hidden] { display: none; }
+    /* 兜底：极小屏幕文字超出可见区时，从顶部排起、可在区域内滚动，上下边缘用 mask 渐隐；文字上下留出渐隐高度，滚到两端时首尾行完整可读 */
+    .explore-intro[data-overflow] { align-items: flex-start; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; pointer-events: auto; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%); }
+    .explore-intro[data-overflow]::-webkit-scrollbar { display: none; }
+    .explore-intro[data-overflow] .explore-intro-text { padding-top: 24px; padding-bottom: 24px; }
+    /* 消散开始后不再响应滚动与点击，下方素材可直接点击 */
+    .explore-intro[data-dissolving] { overflow-y: hidden; pointer-events: none; }
+    .explore-intro-text { box-sizing: border-box; width: 100%; max-width: 640px; margin: 0; padding: 0 40px; color: var(--color-input-placeholder); font-size: 16px; font-weight: 400; line-height: 1.7; font-kerning: none; font-variant-ligatures: none; overflow-wrap: break-word; user-select: none; }
+    .explore-intro-word { display: inline-block; white-space: nowrap; }
+    .explore-intro-char { display: inline-block; }
+    .explore-intro-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 
     /* 分割线 → 输入框 42px，输入框 60px，输入框 → 屏幕底部 42px（总高 145px） */
     .input-wrapper { position: fixed; bottom: 0; left: 0; z-index: 10; width: 100%; background: var(--color-page-bg); padding: 42px 0 42px 0; border-top: 1px solid var(--color-border-subtle); transition: background-color 180ms ease, border-color 180ms ease; }
@@ -97,6 +117,7 @@ const projectCards = (await getSortedProjects()).map((p) => ({
     }
 
     @media (max-width: 768px) {
+      .explore-intro-text { padding: 0 24px; }
       .explore-empty:is([data-state='transitioning'], [data-state='compact']) .explore-empty-stage { gap: 8px; }
       /* 手机基准 390×844（舞台 390×589）下为原像素值，更矮或更窄时等比缩小 */
       .explore-empty-button--person { --w: 118px; margin-top: calc(var(--w) * -0.983); }
@@ -123,7 +144,7 @@ const projectCards = (await getSortedProjects()).map((p) => ({
     @keyframes explore-item-in { from { opacity: 0; transform: translateY(6px) scale(0.995); } to { opacity: 1; transform: translateY(0) scale(1); } }
   </style>
 
-  <div class="explore-empty" id="exploreEmpty" data-state="hidden" aria-label="快捷问题" aria-hidden="true" hidden inert>
+  <div class="explore-empty" id="exploreEmpty" data-page-transition-fixed data-state="hidden" aria-label="快捷问题" aria-hidden="true" hidden inert>
     <div class="explore-empty-stage">
       <button class="explore-empty-button explore-empty-button--shirt" type="button" data-empty-question="你如何理解系统体验与视觉风格的关系？" aria-label="发送问题：你如何理解系统体验与视觉风格的关系？">
         <img src="/images/explore/shirt.png" alt="" width="600" height="420" decoding="async" draggable="false" />
@@ -143,8 +164,13 @@ const projectCards = (await getSortedProjects()).map((p) => ({
     </div>
   </div>
 
+  <div class="explore-intro" id="exploreIntro" data-page-transition-fixed hidden>
+    <p class="explore-intro-sr">{EXPLORE_INTRO_TEXT}</p>
+    <p class="explore-intro-text" data-intro-text aria-hidden="true">{EXPLORE_INTRO_TEXT}</p>
+  </div>
+
   <div class="chat-container" id="chatContainer"></div>
-  <div class="input-wrapper">
+  <div class="input-wrapper" data-page-transition-fixed>
     <div class="input-box">
         <input type="text" id="userInput" placeholder="Ask Nimo about projects or skills..." autocomplete="off" maxlength="500" aria-label="向 NIMO 的 AI 助手提问" />
         <button id="sendBtn" type="button" aria-label="发送">

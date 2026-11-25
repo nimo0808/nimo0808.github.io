@@ -7,6 +7,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { getAiEndpoint } from '../lib/ai-endpoint';
 import { FALLBACK_NOTICES, FALLBACK_QA, type FallbackQA, type FallbackReason } from '../data/explore-fallback';
+import { playExploreIntro, type ExploreIntro } from './explore-intro';
 
 interface ProjectCard {
   slug: string;
@@ -31,6 +32,13 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_MESSAGE_LENGTH = 500;
 const MAX_HISTORY_ITEMS = 6;
 const MAX_HISTORY_CONTENT = 1000;
+// 开场结束时素材的显现（与文字消散重叠）：模糊到清晰、0.96 放大到 1、极轻微上升
+const EMPTY_REVEAL_DURATION_MS = 650;
+const EMPTY_REVEAL_STAGGER_MS = 70;
+const EMPTY_REVEAL_BLUR_PX = 10;
+const EMPTY_REVEAL_SCALE = 0.96;
+const EMPTY_REVEAL_RISE_PX = 3;
+const EMPTY_REVEAL_EASING = 'cubic-bezier(0.215, 0.61, 0.355, 1)'; // easeOutCubic
 
 const ALLOWED_TAGS = [
   'p', 'br', 'hr', 'strong', 'b', 'em', 'i', 'del', 'code', 'pre', 'blockquote',
@@ -92,6 +100,7 @@ function init(
   btn: HTMLButtonElement,
   container: HTMLElement,
   emptyState: HTMLElement,
+  introRoot: HTMLElement | null,
   projects: ProjectCard[],
 ) {
   const endpoint = getAiEndpoint();
@@ -100,17 +109,21 @@ function init(
   const emptyButtons = Array.from(
     emptyState.querySelectorAll<HTMLButtonElement>('[data-empty-question]'),
   );
-  const emptyImagesReady = Promise.all(
-    emptyButtons.map((button) => {
-      const image = button.querySelector('img');
-      return image instanceof HTMLImageElement && typeof image.decode === 'function'
-        ? image.decode().catch(() => undefined)
-        : Promise.resolve();
-    }),
-  );
+  // 每张素材 decode 完成（失败也算完成）后记为 settled，开场超时后用来决定哪些素材先出现
+  const emptyImageSettled = emptyButtons.map(() => false);
+  const emptyImageDecodes = emptyButtons.map(async (button, index) => {
+    const image = button.querySelector('img');
+    if (image instanceof HTMLImageElement && typeof image.decode === 'function') {
+      await image.decode().catch(() => undefined);
+    }
+    emptyImageSettled[index] = true;
+  });
+  const emptyImagesReady = Promise.all(emptyImageDecodes);
   let pending = false;
   let transitioning = false;
   let emptyShowFrame: number | undefined;
+  let intro: ExploreIntro | null = null;
+  let introHandedOff = false;
 
   const saveChat = () => {
     try {
@@ -145,6 +158,79 @@ function init(
       if (container.childElementCount === 0 && !emptyState.hidden) {
         emptyState.dataset.state = 'visible';
       }
+    });
+  };
+
+  // 开场衔接的素材显现：文字消散的“倒放”，模糊到清晰、轻微放大落位。
+  // 动画加在按钮内的 img 上：按钮的 transform 留给首次提问 FLIP，filter 留给 hover 投影。
+  // 进行中的显现动画 → 对应的清理函数
+  const revealAnimations = new Map<Animation, () => void>();
+  const revealImage = (button: HTMLButtonElement, delay: number) => {
+    const image = button.querySelector('img');
+    if (!(image instanceof HTMLImageElement) || typeof image.animate !== 'function') return;
+    image.style.willChange = 'opacity, transform, filter';
+    const animation = image.animate(
+      [
+        { opacity: 0, filter: `blur(${EMPTY_REVEAL_BLUR_PX}px)`, transform: `translate3d(0, ${EMPTY_REVEAL_RISE_PX}px, 0) scale(${EMPTY_REVEAL_SCALE})` },
+        { opacity: 1, filter: 'blur(0px)', transform: 'translate3d(0, 0, 0) scale(1)' },
+      ],
+      { duration: EMPTY_REVEAL_DURATION_MS, delay, easing: EMPTY_REVEAL_EASING, fill: 'backwards' },
+    );
+    const cleanup = () => {
+      if (!revealAnimations.delete(animation)) return;
+      image.style.removeProperty('will-change');
+      // Chrome 延迟序列化 CSSOM 写入的内联样式，之后读取会补出空的 style=""；先读取同步，再移除空属性
+      if (image.getAttribute('style') === '') image.removeAttribute('style');
+    };
+    revealAnimations.set(animation, cleanup);
+    animation.addEventListener('finish', cleanup);
+    animation.addEventListener('cancel', cleanup);
+  };
+  // 提问时快进：同步结束全部显现动画并清理，FLIP 从最终尺寸开始测量
+  const finishReveal = () => {
+    for (const [animation, cleanup] of Array.from(revealAnimations)) {
+      try {
+        animation.finish();
+      } catch {
+        animation.cancel();
+      }
+      cleanup();
+    }
+  };
+
+  // 人物最先，其余按与舞台中心的距离由近到远
+  const revealOrder = (buttons: HTMLButtonElement[]): HTMLButtonElement[] => {
+    const stage = emptyState.querySelector('.explore-empty-stage')?.getBoundingClientRect();
+    if (!stage) return buttons;
+    const centerX = stage.left + stage.width / 2;
+    const centerY = stage.top + stage.height / 2;
+    const distance = (button: HTMLButtonElement) => {
+      if (button.classList.contains('explore-empty-button--person')) return -1;
+      const rect = button.getBoundingClientRect();
+      return Math.hypot(rect.left + rect.width / 2 - centerX, rect.top + rect.height / 2 - centerY);
+    };
+    return buttons
+      .map((button) => ({ button, distance: distance(button) }))
+      .sort((a, b) => a.distance - b.distance)
+      .map(({ button }) => button);
+  };
+
+  // 开场衔接时显示素材：已就绪的按顺序显现，开场超时时仍未就绪的在各自 decode 完成后再单独显现
+  const showEmptyStateAfterIntro = () => {
+    const animate = !reducedMotion.matches;
+    if (animate) emptyState.dataset.reveal = 'intro';
+    emptyButtons.forEach((button, index) => {
+      if (emptyImageSettled[index]) return;
+      button.dataset.pending = '';
+      void emptyImageDecodes[index]?.then(() => {
+        delete button.dataset.pending;
+        if (animate && !transitioning && emptyState.dataset.state === 'visible') revealImage(button, 0);
+      });
+    });
+    showEmptyState();
+    if (!animate) return;
+    revealOrder(emptyButtons.filter((button) => button.dataset.pending === undefined)).forEach((button, index) => {
+      revealImage(button, index * EMPTY_REVEAL_STAGGER_MS);
     });
   };
 
@@ -391,6 +477,19 @@ function init(
     if (emptyState.dataset.state !== 'compact') {
       setTransitioning(true);
       try {
+        if (intro) {
+          // 开场中直接提问：文字快速淡出并移除，再从散点位置走现有的 FLIP 收拢流程。
+          // 素材已开始显现（文字仍在消散）时不必等文字淡出，两者并行
+          const current = intro;
+          intro = null;
+          if (introHandedOff) {
+            void current.interrupt();
+          } else {
+            await current.interrupt();
+            showEmptyState();
+          }
+        }
+        finishReveal();
         await dockEmptyState(true);
       } finally {
         setTransitioning(false);
@@ -448,8 +547,28 @@ function init(
   }
 
   if (container.childElementCount === 0) {
-    showEmptyState();
+    const started = introRoot
+      ? playExploreIntro(introRoot, {
+        ready: emptyImagesReady,
+        reducedMotion,
+        // 文字消散到一半时素材开始显现；已被提问打断（intro 已清空）时不再显示
+        onHandoff: () => {
+          if (!intro) return;
+          introHandedOff = true;
+          showEmptyStateAfterIntro();
+        },
+      })
+      : null;
+    if (started) {
+      intro = started;
+      void started.finished.then(() => {
+        if (intro === started) intro = null;
+      });
+    } else {
+      showEmptyState();
+    }
   } else {
+    introRoot?.remove();
     dockEmptyState(false);
   }
 }
@@ -473,5 +592,5 @@ if (
   } catch {
     projects = [];
   }
-  init(input, btn, container, emptyState, projects);
+  init(input, btn, container, emptyState, document.getElementById('exploreIntro'), projects);
 }

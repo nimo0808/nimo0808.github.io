@@ -368,5 +368,10 @@ const experiences = [
         closeOverlay();
       }
     });
+
+    // page-transitions.ts 在索引打开时点击当前页导航会派发此事件
+    document.addEventListener('site-index:close', () => {
+      if (toggleButton.getAttribute('aria-expanded') === 'true') closeOverlay();
+    });
   }
 </script>
